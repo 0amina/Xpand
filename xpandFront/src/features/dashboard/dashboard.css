@@ -1,0 +1,223 @@
+/* --- Cash position hero --------------------------------------------------------------------- */
+
+.cash-hero {
+  display: flex;
+  flex-direction: column;
+  gap: var(--x-space-1);
+  padding: var(--x-space-5) var(--x-space-4);
+  border-radius: var(--x-radius-lg);
+  background: var(--x-surface);
+  box-shadow: var(--x-shadow-sm);
+  /* The accent edge reads as "this is the headline number" without a heavy coloured panel,
+     which would fight whatever theme Telegram hands us. */
+  border-left: 4px solid var(--x-accent);
+}
+
+.cash-hero__label {
+  display: flex;
+  align-items: center;
+  gap: var(--x-space-2);
+  font-size: var(--x-text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--x-text-subtle);
+}
+
+.cash-hero__value {
+  font-size: var(--x-text-2xl);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+.cash-hero__value--negative {
+  color: var(--x-expense);
+}
+
+.cash-hero__currency {
+  font-size: var(--x-text-md);
+  font-weight: 600;
+  color: var(--x-text-dim);
+  margin-left: var(--x-space-1);
+}
+
+.cash-hero__footnote {
+  font-size: var(--x-text-sm);
+  color: var(--x-text-dim);
+  margin-top: var(--x-space-1);
+}
+
+/* --- Today's tiles ---------------------------------------------------------------------------- */
+
+.today-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--x-space-3);
+}
+
+.stat-tile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--x-space-1);
+  padding: var(--x-space-4);
+  border-radius: var(--x-radius-lg);
+  background: var(--x-surface);
+  box-shadow: var(--x-shadow-sm);
+}
+
+.stat-tile__label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--x-text-sm);
+  font-weight: 600;
+  color: var(--x-text-dim);
+}
+
+.stat-tile__value {
+  font-size: var(--x-text-lg);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stat-tile__value--income {
+  color: var(--x-income);
+}
+
+.stat-tile__value--expense {
+  color: var(--x-expense);
+}
+
+.stat-tile__meta {
+  font-size: var(--x-text-xs);
+  color: var(--x-text-subtle);
+}
+
+/* --- Net strip ---------------------------------------------------------------------------------- */
+
+.net-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--x-space-3);
+  padding: var(--x-space-3) var(--x-space-4);
+  border-radius: var(--x-radius-md);
+  background: var(--x-surface);
+  box-shadow: var(--x-shadow-sm);
+  font-size: var(--x-text-sm);
+}
+
+.net-strip__label {
+  color: var(--x-text-dim);
+  font-weight: 500;
+}
+
+.net-strip__value {
+  font-weight: 700;
+}
+
+/* --- Quick actions ------------------------------------------------------------------------------ */
+
+.quick-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--x-space-3);
+}
+
+.quick-action {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 2px;
+  min-height: 66px;
+  padding: var(--x-space-3) var(--x-space-4);
+  border-radius: var(--x-radius-lg);
+  color: #fff;
+  text-align: left;
+  transition: transform var(--x-transition);
+}
+
+.quick-action:active {
+  transform: scale(0.97);
+}
+
+.quick-action--income {
+  background: var(--x-income);
+}
+
+.quick-action--expense {
+  background: var(--x-expense);
+}
+
+.quick-action__title {
+  font-size: var(--x-text-md);
+  font-weight: 700;
+}
+
+.quick-action__hint {
+  font-size: var(--x-text-xs);
+  opacity: 0.85;
+}
+
+.quick-actions--secondary {
+  grid-template-columns: 1fr 1fr;
+}
+
+.quick-action--muted {
+  background: var(--x-surface);
+  color: var(--x-text);
+  box-shadow: var(--x-shadow-sm);
+  min-height: 54px;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--x-space-2);
+  font-weight: 600;
+  font-size: var(--x-text-sm);
+}
+
+/* --- Greeting ---------------------------------------------------------------------------------- */
+
+.dash-greeting {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--x-space-3);
+}
+
+.dash-greeting__name {
+  font-size: var(--x-text-lg);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.dash-greeting__date {
+  font-size: var(--x-text-sm);
+  color: var(--x-text-dim);
+}
+
+/* --- Skeletons --------------------------------------------------------------------------------- */
+
+.skeleton {
+  border-radius: var(--x-radius-md);
+  background: linear-gradient(
+    90deg,
+    var(--x-surface-raised) 25%,
+    color-mix(in srgb, var(--x-text) 7%, var(--x-surface-raised)) 37%,
+    var(--x-surface-raised) 63%
+  );
+  background-size: 400% 100%;
+  animation: skeleton-sweep 1.3s ease-in-out infinite;
+}
+
+@keyframes skeleton-sweep {
+  from {
+    background-position: 100% 50%;
+  }
+  to {
+    background-position: 0 50%;
+  }
+}

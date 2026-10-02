@@ -1,0 +1,161 @@
+/*
+ * Design tokens.
+ *
+ * Layering, outermost first:
+ *   1. `--tg-theme-*` — injected by Telegram (and mirrored by lib/telegram.ts from
+ *      `themeParams`). Absent outside Telegram.
+ *   2. The fallbacks below — Telegram's own light/dark palette values, so the app looks
+ *      native in a plain browser tab too.
+ *   3. `--x-*` semantic tokens — the only thing components are allowed to reference.
+ *
+ * Every colour therefore reads `var(--tg-theme-x, <fallback>)`. Nothing outside this file
+ * should mention `--tg-theme-*` directly.
+ *
+ * Dark mode is resolved two ways because both signals matter: `[data-scheme]` is set from
+ * Telegram's `colorScheme` (authoritative inside the client, and it changes live), while
+ * `prefers-color-scheme` covers the browser. The media query is scoped with `:not([data-scheme])`
+ * so Telegram's explicit choice always wins over the OS setting.
+ */
+
+:root {
+  /* --- Surfaces --- */
+  --x-bg: var(--tg-theme-secondary-bg-color, #f0f2f5);
+  --x-surface: var(--tg-theme-bg-color, #ffffff);
+  --x-surface-raised: var(--tg-theme-section-bg-color, #ffffff);
+  --x-header: var(--tg-theme-header-bg-color, #ffffff);
+
+  /* --- Text --- */
+  --x-text: var(--tg-theme-text-color, #101828);
+  --x-text-dim: var(--tg-theme-hint-color, #707579);
+  --x-text-subtle: var(--tg-theme-subtitle-text-color, #8d949c);
+  --x-link: var(--tg-theme-link-color, #3390ec);
+
+  /* --- Accent / interactive --- */
+  --x-accent: var(--tg-theme-button-color, #3390ec);
+  --x-accent-text: var(--tg-theme-button-text-color, #ffffff);
+  --x-accent-soft: color-mix(in srgb, var(--x-accent) 12%, transparent);
+
+  /* --- Semantic: the two colours this whole app is about --- */
+  --x-income: #1fa971;
+  --x-income-soft: color-mix(in srgb, var(--x-income) 13%, transparent);
+  --x-expense: #e0505b;
+  --x-expense-soft: color-mix(in srgb, var(--x-expense) 13%, transparent);
+  --x-warning: #d98a1a;
+  --x-warning-soft: color-mix(in srgb, var(--x-warning) 14%, transparent);
+  --x-danger: var(--tg-theme-destructive-text-color, #e0505b);
+
+  /* --- Lines --- */
+  --x-border: var(--tg-theme-section-separator-color, rgba(0, 0, 0, 0.09));
+  --x-border-strong: rgba(0, 0, 0, 0.16);
+
+  /* --- Elevation. Kept flat and tight; Telegram's own UI is not shadow-heavy. --- */
+  --x-shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.06);
+  --x-shadow-md: 0 4px 16px rgba(16, 24, 40, 0.1);
+  --x-shadow-lg: 0 -4px 24px rgba(16, 24, 40, 0.12);
+
+  /* --- Spacing (4px base) --- */
+  --x-space-1: 4px;
+  --x-space-2: 8px;
+  --x-space-3: 12px;
+  --x-space-4: 16px;
+  --x-space-5: 20px;
+  --x-space-6: 24px;
+  --x-space-8: 32px;
+
+  /* --- Radii --- */
+  --x-radius-sm: 8px;
+  --x-radius-md: 12px;
+  --x-radius-lg: 16px;
+  --x-radius-xl: 20px;
+  --x-radius-pill: 999px;
+
+  /* --- Type scale --- */
+  --x-font:
+    -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, Helvetica, Arial,
+    sans-serif;
+  /* Tabular figures keep columns of money from jittering as digits change. */
+  --x-font-numeric: 'SF Mono', 'Segoe UI Mono', 'Roboto Mono', ui-monospace, monospace;
+
+  --x-text-xs: 11px;
+  --x-text-sm: 13px;
+  --x-text-base: 15px;
+  --x-text-md: 17px;
+  --x-text-lg: 20px;
+  --x-text-xl: 26px;
+  --x-text-2xl: 34px;
+  --x-text-3xl: 44px;
+
+  /* --- Layout --- */
+  --x-tabbar-height: 58px;
+  --x-header-height: 52px;
+  /* `env()` resolves to 0px where it is unsupported, so no extra guard is needed. */
+  --x-safe-top: env(safe-area-inset-top, 0px);
+  --x-safe-bottom: env(safe-area-inset-bottom, 0px);
+
+  --x-transition: 140ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  color-scheme: light;
+}
+
+/* --- Dark: Telegram's explicit signal --- */
+:root[data-scheme='dark'] {
+  --x-bg: var(--tg-theme-secondary-bg-color, #0e1621);
+  --x-surface: var(--tg-theme-bg-color, #17212b);
+  --x-surface-raised: var(--tg-theme-section-bg-color, #1d2733);
+  --x-header: var(--tg-theme-header-bg-color, #17212b);
+
+  --x-text: var(--tg-theme-text-color, #ffffff);
+  --x-text-dim: var(--tg-theme-hint-color, #8c9aa8);
+  --x-text-subtle: var(--tg-theme-subtitle-text-color, #7d8b99);
+  --x-link: var(--tg-theme-link-color, #6ab3f3);
+
+  --x-accent: var(--tg-theme-button-color, #5288c1);
+  --x-accent-text: var(--tg-theme-button-text-color, #ffffff);
+
+  /* Lifted and desaturated — the light-mode greens/reds vibrate on a dark ground. */
+  --x-income: #4cd08a;
+  --x-expense: #f4737d;
+  --x-warning: #e8a94a;
+  --x-danger: var(--tg-theme-destructive-text-color, #f4737d);
+
+  --x-border: var(--tg-theme-section-separator-color, rgba(255, 255, 255, 0.1));
+  --x-border-strong: rgba(255, 255, 255, 0.18);
+
+  --x-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --x-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
+  --x-shadow-lg: 0 -4px 24px rgba(0, 0, 0, 0.45);
+
+  color-scheme: dark;
+}
+
+/* --- Dark: OS preference, only when Telegram has not spoken --- */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-scheme]) {
+    --x-bg: #0e1621;
+    --x-surface: #17212b;
+    --x-surface-raised: #1d2733;
+    --x-header: #17212b;
+
+    --x-text: #ffffff;
+    --x-text-dim: #8c9aa8;
+    --x-text-subtle: #7d8b99;
+    --x-link: #6ab3f3;
+
+    --x-accent: #5288c1;
+    --x-accent-text: #ffffff;
+
+    --x-income: #4cd08a;
+    --x-expense: #f4737d;
+    --x-warning: #e8a94a;
+    --x-danger: #f4737d;
+
+    --x-border: rgba(255, 255, 255, 0.1);
+    --x-border-strong: rgba(255, 255, 255, 0.18);
+
+    --x-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --x-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
+    --x-shadow-lg: 0 -4px 24px rgba(0, 0, 0, 0.45);
+
+    color-scheme: dark;
+  }
+}

@@ -1,0 +1,201 @@
+/*
+ * Invoice scanning and review.
+ *
+ * Same approach as the rest of the app: no framework, plain custom properties layered over
+ * Telegram's `--tg-theme-*` tokens so these screens follow the user's own light/dark theme.
+ */
+
+/* --- Banners ------------------------------------------------------------------------------ */
+
+.invoice-banner {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  border-radius: var(--x-radius-md);
+  border: 1px solid transparent;
+  font-size: var(--x-text-sm);
+  line-height: 1.45;
+}
+
+.invoice-banner--info {
+  background: var(--x-surface-raised);
+  border-color: var(--x-border);
+  color: var(--x-text);
+}
+
+.invoice-banner--warn {
+  background: color-mix(in srgb, var(--x-warning) 12%, transparent);
+  border-color: color-mix(in srgb, var(--x-warning) 40%, transparent);
+  color: var(--x-text);
+}
+
+.invoice-banner--done,
+.invoice-banner--working {
+  background: var(--x-surface-raised);
+  border-color: var(--x-border);
+  color: var(--x-text);
+  align-items: center;
+}
+
+/* --- The "reading…" spinner --------------------------------------------------------------- */
+
+.invoice-spinner {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  border: 2px solid color-mix(in srgb, var(--x-text-dim) 35%, transparent);
+  border-top-color: var(--x-accent);
+  border-radius: 50%;
+  animation: invoice-spin 0.8s linear infinite;
+}
+
+@keyframes invoice-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Respect a user who has asked for less motion: show a static ring rather than a spinner. */
+@media (prefers-reduced-motion: reduce) {
+  .invoice-spinner {
+    animation: none;
+    border-top-color: var(--x-text-dim);
+  }
+}
+
+/* --- The stored image --------------------------------------------------------------------- */
+
+.invoice-image {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 1px solid var(--x-border);
+  border-radius: var(--x-radius-md);
+  background: var(--x-surface-raised);
+  overflow: hidden;
+  position: relative;
+  cursor: zoom-in;
+}
+
+.invoice-image img {
+  display: block;
+  width: 100%;
+  /* Collapsed: tall enough to recognise the invoice, short enough to keep the form in view. */
+  max-height: 220px;
+  object-fit: cover;
+  object-position: top;
+}
+
+.invoice-image--expanded {
+  cursor: zoom-out;
+}
+
+.invoice-image--expanded img {
+  max-height: none;
+  object-fit: contain;
+}
+
+.invoice-image__hint {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: var(--x-text-xs);
+  /* Fixed dark chip rather than a theme token: it sits on the photo, not on the page. */
+  background: rgb(0 0 0 / 60%);
+  color: #fff;
+}
+
+.invoice-image--loading {
+  min-height: 160px;
+}
+
+.invoice-image--missing {
+  padding: 24px 14px;
+  text-align: center;
+  color: var(--x-text-dim);
+  font-size: var(--x-text-sm);
+  cursor: default;
+}
+
+/* --- Review form -------------------------------------------------------------------------- */
+
+.invoice-amount-row {
+  display: flex;
+  gap: 8px;
+}
+
+.invoice-amount-row .input:first-child {
+  flex: 1 1 auto;
+  font-size: var(--x-text-lg);
+  font-weight: 600;
+}
+
+.invoice-currency {
+  flex: 0 0 72px;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.invoice-actions-row,
+.invoice-card__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.invoice-footnote {
+  text-align: center;
+}
+
+/* --- Queue list --------------------------------------------------------------------------- */
+
+.invoice-card__top {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.invoice-card__title {
+  font-weight: 600;
+  /* Filenames from a camera roll are long and must not push the badge off the row. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.invoice-card__error {
+  color: var(--x-expense);
+}
+
+/* --- Scan screen -------------------------------------------------------------------------- */
+
+.invoice-scan-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.invoice-upload-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Keeps the file inputs reachable by assistive tech while hidden from view. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

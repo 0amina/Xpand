@@ -1,0 +1,207 @@
+@import './tokens.css';
+
+/* --- Reset --------------------------------------------------------------------------------- */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+html {
+  /* Stops iOS from inflating text in landscape, which breaks the fixed keypad grid. */
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  font-family: var(--x-font);
+  font-size: var(--x-text-base);
+  line-height: 1.45;
+  color: var(--x-text);
+  background: var(--x-bg);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+
+  /* The app manages its own scroll containers; the body itself never scrolls. Without this
+     the whole Mini App rubber-bands against the Telegram sheet on every flick. */
+  overscroll-behavior: none;
+}
+
+/* Removes the grey flash on tap in Telegram's Android webview. Focus styling below keeps
+   keyboard users covered. */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  touch-action: manipulation; /* No 300ms double-tap-zoom delay on repeated keypad taps. */
+}
+
+a {
+  color: var(--x-link);
+  text-decoration: none;
+}
+
+ul,
+ol {
+  list-style: none;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
+
+/* Visible only for keyboard navigation, never on touch. */
+:focus-visible {
+  outline: 2px solid var(--x-accent);
+  outline-offset: 2px;
+  border-radius: var(--x-radius-sm);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* --- Shared primitives --------------------------------------------------------------------- */
+
+/** Money and other figures. Tabular digits stop columns from jittering as values change. */
+.numeric {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+}
+
+.income-text {
+  color: var(--x-income);
+}
+
+.expense-text {
+  color: var(--x-expense);
+}
+
+/** Screen-reader-only: announced, never painted. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* --- App skeleton -------------------------------------------------------------------------- */
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  /* 100dvh follows the visual viewport as Telegram's keyboard opens and closes; the vh line
+     above it is the fallback for webviews without dvh support. */
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+.app__body {
+  flex: 1;
+  min-height: 0; /* Lets the flex child actually scroll instead of growing the page. */
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+}
+
+/* Clears the fixed tab bar plus the home indicator. */
+.app__body--with-tabbar {
+  padding-bottom: calc(var(--x-tabbar-height) + var(--x-safe-bottom) + var(--x-space-4));
+}
+
+.page {
+  padding: var(--x-space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--x-space-4);
+}
+
+.page__title {
+  font-size: var(--x-text-lg);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.section-label {
+  font-size: var(--x-text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--x-text-subtle);
+}
+
+/* --- Spinner ------------------------------------------------------------------------------- */
+
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--x-border-strong);
+  border-top-color: var(--x-accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+.spinner--lg {
+  width: 32px;
+  height: 32px;
+  border-width: 3px;
+}
+
+.spinner--on-accent {
+  border-color: color-mix(in srgb, var(--x-accent-text) 35%, transparent);
+  border-top-color: var(--x-accent-text);
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.centered-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--x-space-3);
+  padding: var(--x-space-8) var(--x-space-4);
+  text-align: center;
+  color: var(--x-text-dim);
+}

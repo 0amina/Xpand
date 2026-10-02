@@ -1,0 +1,143 @@
+/* --- Tab bar ------------------------------------------------------------------------------- */
+
+.tabbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 50;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  background: var(--x-surface);
+  border-top: 1px solid var(--x-border);
+  padding-bottom: var(--x-safe-bottom);
+  /* Keeps the bar readable over a list scrolling beneath it on translucent themes. */
+  backdrop-filter: saturate(180%) blur(20px);
+}
+
+.tabbar__item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  height: var(--x-tabbar-height);
+  color: var(--x-text-subtle);
+  transition: color var(--x-transition);
+}
+
+.tabbar__item.is-active {
+  color: var(--x-accent);
+}
+
+.tabbar__item--income.is-active {
+  color: var(--x-income);
+}
+
+.tabbar__item--expense.is-active {
+  color: var(--x-expense);
+}
+
+.tabbar__icon {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.tabbar__label {
+  font-size: var(--x-text-xs);
+  font-weight: 600;
+}
+
+/* --- Screen header ------------------------------------------------------------------------- */
+
+.screen-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: var(--x-space-2);
+  min-height: var(--x-header-height);
+  padding: var(--x-space-2) var(--x-space-4);
+  padding-top: calc(var(--x-space-2) + var(--x-safe-top));
+  background: var(--x-header);
+  border-bottom: 1px solid var(--x-border);
+}
+
+.screen-header__back {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  margin-left: calc(-1 * var(--x-space-2));
+  color: var(--x-link);
+  font-size: 22px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.screen-header__title {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--x-text-md);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.screen-header__action {
+  flex-shrink: 0;
+}
+
+/* --- Connection banner ---------------------------------------------------------------------- */
+
+.offline-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--x-space-2);
+  padding: var(--x-space-2) var(--x-space-4);
+  background: var(--x-warning-soft);
+  color: var(--x-warning);
+  font-size: var(--x-text-sm);
+  font-weight: 600;
+}
+
+/* --- Boot / sign-in --------------------------------------------------------------------------- */
+
+.boot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--x-space-4);
+  height: 100%;
+  padding: var(--x-space-6);
+  text-align: center;
+}
+
+.boot__logo {
+  font-size: 48px;
+  line-height: 1;
+}
+
+.boot__brand {
+  font-size: var(--x-text-xl);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.boot__note {
+  color: var(--x-text-dim);
+  font-size: var(--x-text-sm);
+  max-width: 340px;
+}
+
+.signin-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--x-space-4);
+  width: 100%;
+  max-width: 340px;
+  text-align: left;
+}

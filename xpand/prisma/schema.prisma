@@ -1,0 +1,183 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model categories {
+  id           Int            @id @default(autoincrement())
+  name         String         @unique @db.VarChar(50)
+  type         category_type
+  icon         String?        @db.VarChar(50)
+  color        String?        @db.VarChar(20)
+  transactions transactions[]
+}
+
+model invoices {
+  id                 Int            @id @default(autoincrement())
+  transaction_id     Int?           @unique
+  image_url          String
+  ocr_raw_text       String?
+  ocr_extracted_data Json?
+  created_at         DateTime       @default(now()) @db.Timestamp(6)
+  uploaded_by        BigInt
+  status             invoice_status @default(PENDING)
+  mime_type          String         @db.VarChar(100)
+  file_size          Int
+  original_filename  String?        @db.VarChar(255)
+  ocr_error          String?
+  ocr_model          String?        @db.VarChar(100)
+  ocr_completed_at   DateTime?      @db.Timestamp(6)
+  updated_at         DateTime       @default(now()) @db.Timestamp(6)
+  transactions       transactions?  @relation(fields: [transaction_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  users              users          @relation(fields: [uploaded_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([status], map: "idx_invoices_status")
+  @@index([uploaded_by], map: "idx_invoices_uploaded_by")
+}
+
+model packaging {
+  id                 Int                  @id @default(autoincrement())
+  name               String               @db.VarChar(200)
+  unit               String?              @db.VarChar(50)
+  unit_cost          Decimal?             @db.Decimal(12, 2)
+  created_at         DateTime             @default(now()) @db.Timestamp(6)
+  product_packaging  product_packaging[]
+  supplier_packaging supplier_packaging[]
+  transactions       transactions[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model product_packaging {
+  product_id   Int
+  packaging_id Int
+  quantity     Int       @default(1)
+  packaging    packaging @relation(fields: [packaging_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  products     products  @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([product_id, packaging_id])
+}
+
+model products {
+  id                Int                 @id @default(autoincrement())
+  name              String              @db.VarChar(200)
+  sku               String?             @unique @db.VarChar(100)
+  description       String?
+  unit_price        Decimal?            @db.Decimal(12, 2)
+  created_at        DateTime            @default(now()) @db.Timestamp(6)
+  product_packaging product_packaging[]
+  supplier_products supplier_products[]
+  transactions      transactions[]
+}
+
+model supplier_packaging {
+  supplier_id  Int
+  packaging_id Int
+  unit_price   Decimal?  @db.Decimal(12, 2)
+  packaging    packaging @relation(fields: [packaging_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  suppliers    suppliers @relation(fields: [supplier_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([supplier_id, packaging_id])
+}
+
+model supplier_products {
+  supplier_id Int
+  product_id  Int
+  unit_price  Decimal?  @db.Decimal(12, 2)
+  products    products  @relation(fields: [product_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+  suppliers   suppliers @relation(fields: [supplier_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@id([supplier_id, product_id])
+}
+
+model suppliers {
+  id                 Int                  @id @default(autoincrement())
+  name               String               @db.VarChar(200)
+  contact_person     String?              @db.VarChar(200)
+  phone              String?              @db.VarChar(30)
+  email              String?              @db.VarChar(200)
+  address            String?
+  notes              String?
+  created_at         DateTime             @default(now()) @db.Timestamp(6)
+  supplier_packaging supplier_packaging[]
+  supplier_products  supplier_products[]
+  transactions       transactions[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model transactions {
+  id               Int              @id @default(autoincrement())
+  user_id          BigInt
+  category_id      Int
+  type             transaction_type
+  amount           Decimal          @db.Decimal(12, 2)
+  currency         String           @default("TND") @db.VarChar(3)
+  description      String?
+  transaction_date DateTime         @db.Date
+  payment_method   payment_method   @default(CASH)
+  supplier_id      Int?
+  product_id       Int?
+  packaging_id     Int?
+  created_at       DateTime         @default(now()) @db.Timestamp(6)
+  updated_at       DateTime         @default(now()) @db.Timestamp(6)
+  invoices         invoices?
+  categories       categories       @relation(fields: [category_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  packaging        packaging?       @relation(fields: [packaging_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  products         products?        @relation(fields: [product_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  suppliers        suppliers?       @relation(fields: [supplier_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  users            users            @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([category_id], map: "idx_transactions_category")
+  @@index([transaction_date], map: "idx_transactions_date")
+  @@index([packaging_id], map: "idx_transactions_packaging")
+  @@index([product_id], map: "idx_transactions_product")
+  @@index([supplier_id], map: "idx_transactions_supplier")
+  @@index([user_id], map: "idx_transactions_user")
+}
+
+model users {
+  id           BigInt         @id
+  username     String?        @db.VarChar(100)
+  first_name   String         @db.VarChar(100)
+  last_name    String?        @db.VarChar(100)
+  /// Vestigial. ADMIN is the only value and the app neither reads nor writes it — every
+  /// authenticated user has full access. Kept so roles can return without a data migration.
+  role         role           @default(ADMIN)
+  created_at   DateTime       @default(now()) @db.Timestamp(6)
+  invoices     invoices[]
+  transactions transactions[]
+}
+
+enum category_type {
+  INCOME
+  EXPENSE
+  BOTH
+}
+
+enum payment_method {
+  CASH
+  BANK_TRANSFER
+  CHECK
+  CARD
+  OTHER
+}
+
+enum role {
+  ADMIN
+}
+
+enum transaction_type {
+  INCOME
+  EXPENSE
+}
+
+enum invoice_status {
+  PENDING
+  PROCESSING
+  READY
+  FAILED
+  CONFIRMED
+}

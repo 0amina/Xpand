@@ -1,0 +1,383 @@
+/* --- Amount keypad ---------------------------------------------------------------------------- */
+
+.keypad {
+  display: flex;
+  flex-direction: column;
+  gap: var(--x-space-3);
+}
+
+.keypad__display {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: var(--x-space-2);
+  padding: var(--x-space-5) var(--x-space-4);
+  border-radius: var(--x-radius-lg);
+  background: var(--x-surface);
+  /* Stops the row from reflowing between "0" and "1,234,567.89". */
+  min-height: 104px;
+  overflow: hidden;
+}
+
+.keypad__display--income {
+  color: var(--x-income);
+  background: var(--x-income-soft);
+}
+
+.keypad__display--expense {
+  color: var(--x-expense);
+  background: var(--x-expense-soft);
+}
+
+/* Untouched amounts read as a placeholder, not as a real zero value. */
+.keypad__display.is-empty {
+  color: var(--x-text-subtle);
+  background: var(--x-surface);
+}
+
+.keypad__sign {
+  font-size: var(--x-text-xl);
+  font-weight: 500;
+  opacity: 0.7;
+}
+
+.keypad__value {
+  font-size: var(--x-text-3xl);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  /* Shrinks a long figure rather than letting it overflow the card. */
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.keypad__decimal {
+  opacity: 0.75;
+}
+
+.keypad__currency {
+  font-size: var(--x-text-base);
+  font-weight: 600;
+  opacity: 0.7;
+}
+
+.keypad__grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--x-space-2);
+}
+
+.keypad__key {
+  display: grid;
+  place-items: center;
+  /* Roughly double a system keyboard key — the point of having a custom pad at all. */
+  min-height: 54px;
+  border-radius: var(--x-radius-md);
+  background: var(--x-surface);
+  border: 1px solid var(--x-border);
+  font-size: var(--x-text-lg);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  transition:
+    background var(--x-transition),
+    transform 60ms ease-out;
+}
+
+.keypad__key:active {
+  background: var(--x-surface-raised);
+  transform: scale(0.95);
+}
+
+.keypad__key--action {
+  color: var(--x-text-dim);
+}
+
+/* --- Category grid ------------------------------------------------------------------------------ */
+
+.cat-grid {
+  display: grid;
+  /* auto-fill keeps 3 columns on a 360px phone and 4 on a wider one, without a breakpoint. */
+  grid-template-columns: repeat(auto-fill, minmax(94px, 1fr));
+  gap: var(--x-space-2);
+}
+
+.cat-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--x-space-1);
+  min-height: 78px;
+  padding: var(--x-space-2);
+  border-radius: var(--x-radius-md);
+  background: var(--x-surface);
+  border: 1.5px solid var(--x-border);
+  transition:
+    border-color var(--x-transition),
+    background var(--x-transition),
+    transform var(--x-transition);
+}
+
+.cat-tile:active {
+  transform: scale(0.96);
+}
+
+.cat-tile[aria-pressed='true'] {
+  border-color: var(--cat-color, var(--x-accent));
+  background: color-mix(in srgb, var(--cat-color, var(--x-accent)) 12%, transparent);
+}
+
+.cat-tile__icon {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.cat-tile__name {
+  font-size: var(--x-text-xs);
+  font-weight: 600;
+  text-align: center;
+  line-height: 1.25;
+  color: var(--x-text);
+  /* Two lines maximum, so one long name can't make the whole grid taller. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-word;
+}
+
+/* --- Entity picker ------------------------------------------------------------------------------ */
+
+.picker-trigger {
+  display: flex;
+  align-items: center;
+  gap: var(--x-space-3);
+  width: 100%;
+  min-height: 46px;
+  padding: var(--x-space-3);
+  background: var(--x-surface-raised);
+  border: 1.5px solid var(--x-border);
+  border-radius: var(--x-radius-md);
+  text-align: left;
+  transition: border-color var(--x-transition);
+}
+
+.picker-trigger__value {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.picker-trigger__value--empty {
+  color: var(--x-text-subtle);
+}
+
+.picker-trigger__clear {
+  flex-shrink: 0;
+  color: var(--x-text-subtle);
+  font-size: 18px;
+  line-height: 1;
+  padding: 0 var(--x-space-1);
+}
+
+.picker-search {
+  padding: var(--x-space-3) var(--x-space-4);
+  border-bottom: 1px solid var(--x-border);
+  position: sticky;
+  top: 0;
+  background: var(--x-surface);
+  z-index: 1;
+}
+
+.picker-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--x-space-3);
+  width: 100%;
+  padding: var(--x-space-3) var(--x-space-4);
+  text-align: left;
+  transition: background var(--x-transition);
+}
+
+.picker-option:active {
+  background: var(--x-surface-raised);
+}
+
+.picker-option + .picker-option {
+  border-top: 1px solid var(--x-border);
+}
+
+.picker-option__name {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--x-text-base);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.picker-option__meta {
+  flex-shrink: 0;
+  font-size: var(--x-text-sm);
+  color: var(--x-text-dim);
+}
+
+.picker-option__check {
+  color: var(--x-accent);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+/* --- Disclosure ("More details") ---------------------------------------------------------------- */
+
+.disclosure {
+  border: 1px solid var(--x-border);
+  border-radius: var(--x-radius-lg);
+  background: var(--x-surface);
+  overflow: hidden;
+}
+
+.disclosure__summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--x-space-2);
+  width: 100%;
+  padding: var(--x-space-3) var(--x-space-4);
+  font-size: var(--x-text-base);
+  font-weight: 600;
+}
+
+.disclosure__count {
+  margin-left: auto;
+  font-size: var(--x-text-xs);
+  font-weight: 600;
+  color: var(--x-accent);
+  background: var(--x-accent-soft);
+  border-radius: var(--x-radius-pill);
+  padding: 1px var(--x-space-2);
+}
+
+.disclosure__chevron {
+  color: var(--x-text-subtle);
+  transition: transform var(--x-transition);
+  font-size: 14px;
+}
+
+.disclosure__chevron.is-open {
+  transform: rotate(90deg);
+}
+
+.disclosure__content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--x-space-4);
+  padding: 0 var(--x-space-4) var(--x-space-4);
+  border-top: 1px solid var(--x-border);
+  padding-top: var(--x-space-4);
+}
+
+/* --- Invoice capture ---------------------------------------------------------------------------- */
+
+.invoice-drop {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--x-space-2);
+  width: 100%;
+  min-height: 76px;
+  border: 1.5px dashed var(--x-border-strong);
+  border-radius: var(--x-radius-md);
+  color: var(--x-text-dim);
+  font-size: var(--x-text-sm);
+  font-weight: 500;
+  background: var(--x-surface-raised);
+}
+
+.invoice-preview {
+  position: relative;
+  border-radius: var(--x-radius-md);
+  overflow: hidden;
+  border: 1px solid var(--x-border);
+}
+
+.invoice-preview__image {
+  width: 100%;
+  max-height: 220px;
+  object-fit: cover;
+  background: var(--x-surface-raised);
+}
+
+.invoice-preview__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--x-space-2);
+  padding: var(--x-space-2) var(--x-space-3);
+  background: var(--x-surface);
+  font-size: var(--x-text-sm);
+  color: var(--x-text-dim);
+}
+
+/*
+ * The local-only warning.
+ *
+/*
+ * A standing notice that something needs attention — currently invoices uploaded but not yet
+ * verified. It used to warn that an attachment had never left the device; uploads exist now, so
+ * the warning is gone and the style was kept for the thing that replaced it.
+ */
+.dashboard-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--x-space-2);
+  padding: var(--x-space-3);
+  border-radius: var(--x-radius-md);
+  background: var(--x-warning-soft);
+  color: var(--x-warning);
+  font-size: var(--x-text-sm);
+  line-height: 1.45;
+}
+
+.dashboard-notice strong {
+  font-weight: 700;
+}
+
+/* --- Form scaffolding --------------------------------------------------------------------------- */
+
+.entry-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--x-space-4);
+  padding: var(--x-space-4);
+  /* Room for the sticky save bar plus the tab bar underneath it. */
+  padding-bottom: calc(var(--x-tabbar-height) + var(--x-safe-bottom) + 96px);
+}
+
+.entry-form__submit-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(var(--x-tabbar-height) + var(--x-safe-bottom));
+  z-index: 40;
+  padding: var(--x-space-3) var(--x-space-4);
+  background: var(--x-surface);
+  border-top: 1px solid var(--x-border);
+}
+
+.date-quick-row {
+  display: flex;
+  gap: var(--x-space-2);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.date-quick-row .input {
+  flex: 1;
+  min-width: 140px;
+}

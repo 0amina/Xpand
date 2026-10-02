@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <!--
+      `viewport-fit=cover` + `interactive-widget=resizes-content` keep the layout correct when
+      Telegram's keyboard opens and on notched devices. `user-scalable=no` stops the accidental
+      double-tap zoom that plagues fast repeated tapping on the keypad.
+    -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content"
+    />
+    <meta name="theme-color" content="#17212b" />
+    <title>Xpand</title>
+    <!--
+      Telegram's Mini App SDK. Must load before the bundle so `window.Telegram.WebApp` exists
+      when React boots. Outside Telegram this simply leaves the global undefined and the app
+      falls back to browser/dev mode.
+    -->
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
