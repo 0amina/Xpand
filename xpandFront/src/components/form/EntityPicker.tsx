@@ -1,22 +1,55 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 
-import { usePackaging, useProducts, useSuppliers } from '@/api/hooks';
+import {
+  useCreateProduct,
+  useCreateSupplier,
+  useEntityName,
+  usePackaging,
+  useProducts,
+  useSuppliers,
+} from '@/api/hooks';
+import { Button } from '@/components/ui/Button';
 import { Sheet } from '@/components/ui/Sheet';
 import { EmptyState, ErrorState, LoadingState } from '@/components/ui/States';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
+import { useToast } from '@/hooks/useToast';
+import { describeError } from '@/lib/errors';
 import { formatAmount } from '@/lib/format';
 import { haptics } from '@/lib/telegram';
 import type { EntityKind } from '@/types/api';
 
 import './form.css';
 
-/** What each kind renders and where it fetches from. */
-const CONFIG: Record<EntityKind, { label: string; searchPlaceholder: string; emptyIcon: string }> =
-  {
-    supplier: { label: 'Supplier', searchPlaceholder: 'Search suppliers…', emptyIcon: '🚚' },
-    product: { label: 'Product', searchPlaceholder: 'Search products…', emptyIcon: '📦' },
-    packaging: { label: 'Packaging', searchPlaceholder: 'Search packaging…', emptyIcon: '🧃' },
-  };
+/**
+ * What each kind renders and where it fetches from.
+ *
+ * `managePath` is null for packaging: the API accepts writes, but there is no screen for them —
+ * see the note in `features/catalog/catalog.ts`.
+ */
+const CONFIG: Record<
+  EntityKind,
+  { label: string; searchPlaceholder: string; emptyIcon: string; managePath: string | null }
+> = {
+  supplier: {
+    label: 'Supplier',
+    searchPlaceholder: 'Search suppliers…',
+    emptyIcon: '🚚',
+    managePath: '/suppliers',
+  },
+  product: {
+    label: 'Product',
+    searchPlaceholder: 'Search products…',
+    emptyIcon: '📦',
+    managePath: '/products',
+  },
+  packaging: {
+    label: 'Packaging',
+    searchPlaceholder: 'Search packaging…',
+    emptyIcon: '🧃',
+    managePath: null,
+  },
+};
 
 interface Option {
   id: number;
@@ -34,17 +67,23 @@ interface EntityPickerProps {
 }
 
 /**
- * Searchable single-select for the optional supplier / product / packaging links on an
- * expense.
+ * Searchable single-select for the optional supplier / product / packaging links on a
+ * transaction.
  *
  * Opens as a bottom sheet and fetches lazily — the three lists are irrelevant to a plain cash
  * expense, so nothing is requested until a picker is actually opened.
+ *
+ * A supplier or product the list does not have can be **created from here**, by name, without
+ * abandoning a half-filled form. That is the point: discovering mid-entry that the supplier is
+ * missing used to mean giving up on the field. The rest of the record — phone, SKU, price — is
+ * still edited on its own screen, linked from the footer.
  */
 export function EntityPicker({ kind, value, onChange, selectedName }: EntityPickerProps) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebouncedValue(search);
   const config = CONFIG[kind];
+  const toast = useToast();
 
   // All three hooks run unconditionally (rules of hooks) but only the relevant one is enabled,
   // and only once the sheet is open.
@@ -53,6 +92,10 @@ export function EntityPicker({ kind, value, onChange, selectedName }: EntityPick
   const packaging = usePackaging(debouncedSearch, open && kind === 'packaging');
 
   const query = kind === 'supplier' ? suppliers : kind === 'product' ? products : packaging;
+
+  const createSupplier = useCreateSupplier();
+  const createProduct = useCreateProduct();
+  const createMutation = kind === 'supplier' ? createSupplier : createProduct;
 
   const options: Option[] = (() => {
     if (kind === 'supplier') {
@@ -76,13 +119,50 @@ export function EntityPicker({ kind, value, onChange, selectedName }: EntityPick
     }));
   })();
 
-  const displayName = selectedName ?? options.find((o) => o.id === value)?.name ?? null;
+  // The list is only fetched once the sheet has been opened, so on an edit form a selected id has
+  // no name to show until then — the trigger read "Choose supplier" over a value that was set.
+  // This resolves that one record directly, and is skipped when the caller supplies the name.
+  const resolved = useEntityName(kind, selectedName ? null : value);
+  const displayName =
+    selectedName ??
+    options.find((o) => o.id === value)?.name ??
+    resolved.data?.name ??
+    (value !== null && resolved.isLoading ? '…' : null);
 
   const select = (id: number) => {
     haptics.tap();
     onChange(id === value ? null : id); // Tapping the current selection clears it.
     setOpen(false);
   };
+
+  /** Create a record from whatever is typed in the search box, then select it. */
+  const createFromSearch = async () => {
+    const name = search.trim();
+    if (!name || config.managePath === null) return;
+
+    try {
+      const created =
+        kind === 'supplier'
+          ? await createSupplier.mutateAsync({ name })
+          : await createProduct.mutateAsync({ name });
+
+      haptics.success();
+      toast.success(`${created.name} added.`);
+      onChange(created.id);
+      setSearch('');
+      setOpen(false);
+    } catch (error) {
+      const { description } = describeError(error);
+      toast.error(description);
+    }
+  };
+
+  /** Whether the typed name is worth offering as a new record. */
+  const typed = search.trim();
+  const canCreate =
+    config.managePath !== null &&
+    typed.length > 0 &&
+    !options.some((o) => o.name.toLowerCase() === typed.toLowerCase());
 
   return (
     <>
@@ -145,9 +225,22 @@ export function EntityPicker({ kind, value, onChange, selectedName }: EntityPick
             icon={config.emptyIcon}
             title={search ? 'No matches' : `No ${config.label.toLowerCase()} records`}
             description={
-              search
-                ? 'Try a different search term.'
-                : `${config.label} records can be added through the API.`
+              config.managePath === null
+                ? 'Packaging records are managed through the API.'
+                : search
+                  ? 'Nothing matches that. Add it as a new record, or search for something else.'
+                  : 'Add the first one and it stays available on every entry afterwards.'
+            }
+            action={
+              canCreate ? (
+                <Button
+                  size="sm"
+                  loading={createMutation.isPending}
+                  onClick={() => void createFromSearch()}
+                >
+                  Add &ldquo;{typed}&rdquo;
+                </Button>
+              ) : undefined
             }
           />
         ) : (
@@ -165,7 +258,36 @@ export function EntityPicker({ kind, value, onChange, selectedName }: EntityPick
                 </button>
               </li>
             ))}
+
+            {/* Offered alongside near-misses too: "Sotupa" matching "Sotupa Nord" does not mean
+                the record you want already exists. */}
+            {canCreate && (
+              <li>
+                <button
+                  type="button"
+                  className="picker-option picker-option--create"
+                  disabled={createMutation.isPending}
+                  onClick={() => void createFromSearch()}
+                >
+                  <span className="picker-option__name">+ Add &ldquo;{typed}&rdquo;</span>
+                  <span className="picker-option__meta">
+                    {createMutation.isPending ? 'Adding…' : `New ${config.label.toLowerCase()}`}
+                  </span>
+                </button>
+              </li>
+            )}
           </ul>
+        )}
+
+        {config.managePath !== null && (
+          <div className="picker-footer">
+            <Link to={config.managePath} onClick={() => setOpen(false)}>
+              Manage {config.label.toLowerCase()}s
+            </Link>
+            <span className="field__hint">
+              Phone numbers, SKUs and prices are edited there. Adding one here only needs a name.
+            </span>
+          </div>
         )}
       </Sheet>
     </>

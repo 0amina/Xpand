@@ -114,6 +114,8 @@ branch on.
 | `/transactions`          | History — filter by type, date range, category; grouped by day with daily nets                |
 | `/transactions/:id`      | Detail — every field, edit, delete                                                            |
 | `/transactions/:id/edit` | Edit                                                                                          |
+| `/suppliers`             | Suppliers — searchable list; `/suppliers/new` and `/suppliers/:id` add and edit one           |
+| `/products`              | Products — the same, with SKU and a reference unit price                                      |
 | `/invoices`              | Invoice queue — what is uploaded, what still needs reviewing                                  |
 | `/invoices/scan`         | Photograph or pick an invoice and upload it                                                   |
 | `/invoices/:id/review`   | **The verification step** — check what OCR read, then save                                    |
@@ -159,6 +161,35 @@ computes report boundaries in UTC from the _server_ clock. Without intervention,
 Tunisia (UTC+1) logging at 00:30 would see yesterday's totals above a form filing under today's
 date. The dashboard therefore always sends `?on=<local today>` to `/api/reports/summary`. See
 the notes in [`src/lib/format.ts`](src/lib/format.ts).
+
+## Suppliers and products
+
+Both are managed in the app now, not only through the API. `/suppliers` and `/products` are
+searchable lists where every row opens its own edit form, and there is deliberately **no
+read-only detail screen in between**: these records are a handful of fields with no history, so a
+detail view would be the same information one tap further away.
+
+Three things are worth knowing:
+
+**There are two ways in, for two different moments.** The dashboard's quick actions cover "I need
+to tidy up the supplier list". The entity picker on the income and expense forms covers the one
+that actually happens — realising mid-entry that the supplier you are logging against does not
+exist yet. The picker can **create one by name** without leaving the half-filled form, and
+selects it immediately; the rest of the record (phone, SKU, price) is filled in later, on its own
+screen. Before this, that moment was a dead end.
+
+**Clearing a field needs an explicit `null`.** On a PATCH, an omitted key means "leave this
+alone", so an emptied input has to send null or the old value survives a save that visibly
+cleared it. `forUpdate()` in [`src/features/catalog/catalog.ts`](src/features/catalog/catalog.ts)
+is that rule in one place; `forCreate()` is its counterpart, because a create rejects null and an
+omitted field is already stored as null.
+
+**Delete is refused when the ledger still points at the record.** The backend answers 409 with
+the count of transactions involved, and the form shows that message as-is rather than flattening
+it to "could not delete" — the count is the part that tells you what to do next.
+
+Packaging has no screen. The API supports it, but nothing in this company's workflow adds one, so
+its picker still says so rather than offering an inline add.
 
 ## Invoice scanning
 
@@ -231,14 +262,19 @@ import, a hook that throws on first render, a crash reading a field that is null
 
 Two scripts, runnable on their own:
 
-| Script                       | What it drives                                                                                                                                         |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `scripts/smoke-invoices.mjs` | The invoice screens, including the in-app camera: the stream opens, the shutter grabs a frame, accepting it hands a JPEG to the uploader.              |
-| `scripts/smoke-entry.mjs`    | `/add/expense` in both hosts — a browser tab, where the page must render the only Save button, and a faked Telegram client, where it must render none. |
+| Script                       | What it drives                                                                                                                                            |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `scripts/smoke-invoices.mjs` | The invoice screens, including the in-app camera: the stream opens, the shutter grabs a frame, accepting it hands a JPEG to the uploader.                 |
+| `scripts/smoke-entry.mjs`    | `/add/expense` in both hosts — a browser tab, where the page must render the only Save button, and a faked Telegram client, where it must render none.    |
+| `scripts/smoke-catalog.mjs`  | The supplier and product screens, end to end: add, edit (including clearing a field), select on the expense form, add one inline from the picker, delete. |
 
 Each fakes only the browser: no `mediaDevices` and no canvas exist in jsdom, and a valid Telegram
 `initData` signature cannot be minted outside Telegram, so that credential is swapped for the dev
 header. The backend is real, and so is everything above those seams.
+
+`smoke-catalog.mjs` **writes to the database it is pointed at**. Every row it creates is named
+`Smoke Test …` and deleted again in a `finally` block, so a failed run does not leave litter —
+but point it at a local backend, not a production one.
 
 Run `npm run build` first; both read from `dist/`.
 
@@ -275,6 +311,7 @@ src/
 │   ├── auth/       # Boot, error, and dev sign-in screens
 │   ├── dashboard/
 │   ├── entry/      # The add/edit transaction form
+│   ├── catalog/    # Supplier and product lists, and their add/edit forms
 │   ├── invoices/   # Scan, review-and-confirm, and the queue screen
 │   └── transactions/
 ├── hooks/          # useAuth, useToast, Telegram buttons, debounce
@@ -293,8 +330,8 @@ Scoped out, matching the backend's own status:
 - **Invoice line items.** Only the five header fields are extracted (supplier, date, total,
   currency, invoice number). Per-line products, quantities, prices and VAT are the natural next
   step; `ocr_extracted_data` is JSONB and versioned for exactly that.
-- **CRUD screens** for suppliers / products / packaging. The app _reads_ all three for the
-  expense pickers; the API accepts writes from anyone, but there is no UI for them yet.
+- **CRUD screens for packaging.** Suppliers and products now have them; packaging does not,
+  because nothing in this company's workflow adds one. The endpoints are open either way.
 - **Category management.** Same: the endpoints are open, the screens do not exist.
 - **Reports beyond the dashboard.** `/api/reports/by-category` is wired up as a hook
   (`useByCategory`) but has no screen — a spending-breakdown view is the natural next addition.

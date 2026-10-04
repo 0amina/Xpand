@@ -1,0 +1,44 @@
+/*
+ * Supplier and product management.
+ *
+ * Almost everything here is reused: the rows are `.list-row`, the forms are `.entry-form` and
+ * its save bar, the fields are `.input`. Only these four rules are new.
+ */
+
+/* Row avatar, sized to match `.cat-avatar` on the transaction rows so the two lists line up. */
+.catalog-avatar {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--x-radius-md);
+  background: var(--x-surface-raised);
+  font-size: 18px;
+}
+
+.catalog-row__trailing {
+  flex-shrink: 0;
+  font-size: var(--x-text-sm);
+  font-weight: 600;
+  color: var(--x-text-dim);
+}
+
+/* Separated from the fields above it, so Delete is never the button you meant to press. */
+.catalog-danger {
+  display: flex;
+  flex-direction: column;
+  gap: var(--x-space-2);
+  margin-top: var(--x-space-5);
+  padding-top: var(--x-space-4);
+  border-top: 1px solid var(--x-border);
+}
+
+/* The "+ New" affordance in a screen header. */
+.screen-header__link {
+  font-size: var(--x-text-sm);
+  font-weight: 600;
+  color: var(--x-link);
+  padding: var(--x-space-1) var(--x-space-2);
+  white-space: nowrap;
+}

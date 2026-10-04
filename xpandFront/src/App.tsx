@@ -4,6 +4,9 @@ import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { TabBar } from '@/components/layout/TabBar';
 import { EmptyState } from '@/components/ui/States';
 import { BootError, BootLoading, DevSignIn } from '@/features/auth/BootScreens';
+import { CatalogPage } from '@/features/catalog/CatalogPage';
+import { ProductFormPage } from '@/features/catalog/ProductFormPage';
+import { SupplierFormPage } from '@/features/catalog/SupplierFormPage';
 import { DashboardPage } from '@/features/dashboard/DashboardPage';
 import { TransactionFormPage } from '@/features/entry/TransactionFormPage';
 import { InvoiceReviewPage } from '@/features/invoices/InvoiceReviewPage';
@@ -45,6 +48,17 @@ export function App() {
           <Route path="/transactions" element={<TransactionsPage />} />
           <Route path="/transactions/:id" element={<TransactionDetailPage />} />
           <Route path="/transactions/:id/edit" element={<TransactionFormPage mode="edit" />} />
+
+          {/* Suppliers and products. `/:id` is the edit form, not a read-only detail screen —
+              these records are six fields and no history, so a detail view would only put the
+              same information one tap further away. `new` is declared first so it is not
+              swallowed by the `:id` pattern. */}
+          <Route path="/suppliers" element={<CatalogPage kind="supplier" />} />
+          <Route path="/suppliers/new" element={<SupplierFormPage mode="create" />} />
+          <Route path="/suppliers/:id" element={<SupplierFormPage mode="edit" />} />
+          <Route path="/products" element={<CatalogPage kind="product" />} />
+          <Route path="/products/new" element={<ProductFormPage mode="create" />} />
+          <Route path="/products/:id" element={<ProductFormPage mode="edit" />} />
 
           <Route path="/invoices" element={<PendingInvoicesPage />} />
           <Route path="/invoices/scan" element={<ScanInvoicePage />} />

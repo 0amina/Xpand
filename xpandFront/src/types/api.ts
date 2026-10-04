@@ -296,5 +296,51 @@ export interface Packaging {
   createdAt: string;
 }
 
+/**
+ * Write payloads for the catalog entities.
+ *
+ * Three conventions, all inherited from the backend's Zod schemas:
+ *
+ *  - Only `name` is required. It is the one NOT NULL column.
+ *  - On a **create**, an optional field is `optional` and never `null` — the API rejects an
+ *    explicit null, and an omitted key is already stored as null. `stripUndefined` in `lib/api`
+ *    drops the keys for you.
+ *  - On an **update**, `undefined` means "leave this alone", so clearing a value needs an
+ *    explicit `null`. That asymmetry is the whole reason the update types are written out rather
+ *    than being `Partial<Create…>`.
+ */
+export interface CreateSupplierInput {
+  name: string;
+  contactPerson?: string;
+  phone?: string;
+  email?: string;
+  address?: string;
+  notes?: string;
+}
+
+export interface UpdateSupplierInput {
+  name?: string;
+  contactPerson?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  address?: string | null;
+  notes?: string | null;
+}
+
+export interface CreateProductInput {
+  name: string;
+  sku?: string;
+  description?: string;
+  /** A JSON **number** on the way in, at most 2 decimals — a string on the way back out. */
+  unitPrice?: number;
+}
+
+export interface UpdateProductInput {
+  name?: string;
+  sku?: string | null;
+  description?: string | null;
+  unitPrice?: number | null;
+}
+
 /** The three entity kinds that can optionally be attached to a transaction. */
 export type EntityKind = 'supplier' | 'product' | 'packaging';

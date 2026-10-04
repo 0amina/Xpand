@@ -394,3 +394,25 @@
   flex: 1;
   min-width: 140px;
 }
+
+/* --- Entity picker: inline creation ------------------------------------------------------------- */
+
+.picker-option--create {
+  color: var(--x-link);
+  font-weight: 600;
+}
+
+.picker-option--create:disabled {
+  opacity: 0.6;
+}
+
+/* Sits under the list rather than in the sheet footer slot, so it scrolls with the options
+   instead of taking a fixed strip out of an already short sheet. */
+.picker-footer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--x-space-1);
+  padding: var(--x-space-3) var(--x-space-4) var(--x-space-4);
+  border-top: 1px solid var(--x-border);
+  font-size: var(--x-text-sm);
+}

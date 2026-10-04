@@ -126,6 +126,12 @@ export function DashboardPage() {
           <Link to="/invoices/scan" className="quick-action quick-action--muted">
             <span aria-hidden="true">🧾</span> Scan invoice
           </Link>
+          <Link to="/suppliers" className="quick-action quick-action--muted">
+            <span aria-hidden="true">🚚</span> Suppliers
+          </Link>
+          <Link to="/products" className="quick-action quick-action--muted">
+            <span aria-hidden="true">📦</span> Products
+          </Link>
         </div>
       </div>
 

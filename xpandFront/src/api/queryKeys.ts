@@ -41,7 +41,9 @@ export const queryKeys = {
   entities: {
     all: ['entities'] as const,
     suppliers: (search: string) => ['entities', 'suppliers', search] as const,
+    supplier: (id: number) => ['entities', 'supplier', id] as const,
     products: (search: string) => ['entities', 'products', search] as const,
+    product: (id: number) => ['entities', 'product', id] as const,
     packaging: (search: string) => ['entities', 'packaging', search] as const,
   },
 } as const;

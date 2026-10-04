@@ -14,9 +14,23 @@ export const createSupplierSchema = z.object({
 
 export type CreateSupplierInput = z.infer<typeof createSupplierSchema>;
 
-/** Update payload: all optional, but the body must not be empty. */
-export const updateSupplierSchema = createSupplierSchema
-  .partial()
+/**
+ * Update payload: all optional, but the body must not be empty.
+ *
+ * The nullable fields accept an explicit `null`, which `createSupplierSchema` has no need for —
+ * omitting a field there already stores null. On an update `undefined` means "leave this alone",
+ * so without `null` there is no way to express "clear it", and an edit form could add a phone
+ * number but never remove one.
+ */
+export const updateSupplierSchema = z
+  .object({
+    name: z.string().trim().min(1, 'name is required').max(200).optional(),
+    contactPerson: z.string().trim().max(200).nullish(),
+    phone: z.string().trim().max(30).nullish(),
+    email: z.string().trim().email('email must be valid').max(200).nullish(),
+    address: z.string().trim().max(2000).nullish(),
+    notes: z.string().trim().max(2000).nullish(),
+  })
   .refine((data) => Object.keys(data).length > 0, {
     message: 'At least one field must be provided',
   });

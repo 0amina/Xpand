@@ -87,6 +87,16 @@ curl -X PATCH http://localhost:3000/api/suppliers/1 \
   -d '{ "phone": "+216 21 111 111", "notes": "Net-30 terms" }'
 ```
 
+Every optional field accepts an explicit `null`, which **clears** it. An omitted field is left
+alone, so null is the only way to say "remove this" — without it the Mini App's edit form could
+add a phone number but never take one away.
+
+```bash
+curl -X PATCH http://localhost:3000/api/suppliers/1 \
+  -H 'x-telegram-id: 111' -H 'Content-Type: application/json' \
+  -d '{ "phone": null }'
+```
+
 ### Link a product to this supplier (with a negotiated price)
 
 ```bash

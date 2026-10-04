@@ -69,6 +69,15 @@ curl -X PATCH http://localhost:3000/api/products/1 \
   -d '{ "unitPrice": 13.00 }'
 ```
 
+`sku`, `description` and `unitPrice` accept an explicit `null`, which **clears** the column. An
+omitted field is left alone, so null is the only way to remove a value that is already set.
+
+```bash
+curl -X PATCH http://localhost:3000/api/products/1 \
+  -H 'x-telegram-id: 111' -H 'Content-Type: application/json' \
+  -d '{ "sku": null, "unitPrice": null }'
+```
+
 ### Link packaging with a quantity (bill of materials)
 
 ```bash

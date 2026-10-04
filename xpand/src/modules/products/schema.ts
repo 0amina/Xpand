@@ -11,8 +11,17 @@ export const createProductSchema = z.object({
 
 export type CreateProductInput = z.infer<typeof createProductSchema>;
 
-export const updateProductSchema = createProductSchema
-  .partial()
+/**
+ * Update payload. As with suppliers, the nullable fields accept an explicit `null` so an edit
+ * form can clear a SKU or a unit price rather than only ever setting one.
+ */
+export const updateProductSchema = z
+  .object({
+    name: z.string().trim().min(1, 'name is required').max(200).optional(),
+    sku: z.string().trim().min(1).max(100).nullish(),
+    description: z.string().trim().max(2000).nullish(),
+    unitPrice: decimal2().nullish(),
+  })
   .refine((data) => Object.keys(data).length > 0, {
     message: 'At least one field must be provided',
   });

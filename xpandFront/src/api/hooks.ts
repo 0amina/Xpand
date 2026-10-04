@@ -7,6 +7,8 @@ import type {
   ByCategoryQuery,
   Category,
   ConfirmInvoiceInput,
+  CreateProductInput,
+  CreateSupplierInput,
   CreateTransactionInput,
   EntityKind,
   Invoice,
@@ -19,6 +21,8 @@ import type {
   SummaryQuery,
   Transaction,
   TransactionFilters,
+  UpdateProductInput,
+  UpdateSupplierInput,
   UpdateTransactionInput,
   User,
 } from '@/types/api';
@@ -161,8 +165,8 @@ export function useByCategory(query: ByCategoryQuery = {}) {
 }
 
 // --- Suppliers / Products / Packaging --------------------------------------------------------
-// Used only by the optional pickers on the expense form. `enabled` keeps them from firing
-// until a picker is actually opened — no cost on the hot path.
+// Read by the optional pickers on the entry form and by the catalog screens. `enabled` keeps
+// the picker's fetch from firing until a picker is actually opened — no cost on the hot path.
 
 export function useSuppliers(search: string, enabled = true) {
   return useQuery({
@@ -191,6 +195,113 @@ export function usePackaging(search: string, enabled = true) {
       api.get<Packaging[]>('/api/packaging', stripUndefined({ search }), signal),
     enabled,
     staleTime: 5 * 60_000,
+  });
+}
+
+/**
+ * Invalidate every cached view of the catalog.
+ *
+ * Deliberately the whole `entities` branch rather than one search key: a rename changes what any
+ * `?search=` term matches, and a picker's cached list is as stale as the catalog screen's. Both
+ * are small lists that refetch in a single request.
+ */
+function useInvalidateEntities() {
+  const client = useQueryClient();
+  return () => void client.invalidateQueries({ queryKey: queryKeys.entities.all });
+}
+
+/** One supplier, for the edit form. The detail endpoint also embeds its product/packaging links. */
+export function useSupplier(id: number | undefined) {
+  return useQuery({
+    queryKey: queryKeys.entities.supplier(id ?? -1),
+    queryFn: () => api.get<Supplier>(`/api/suppliers/${id}`),
+    enabled: id !== undefined && Number.isFinite(id),
+  });
+}
+
+export function useCreateSupplier() {
+  const invalidate = useInvalidateEntities();
+
+  return useMutation({
+    mutationFn: (input: CreateSupplierInput) =>
+      api.post<Supplier>('/api/suppliers', stripUndefined({ ...input })),
+    onSuccess: invalidate,
+  });
+}
+
+export function useUpdateSupplier() {
+  const client = useQueryClient();
+  const invalidate = useInvalidateEntities();
+
+  return useMutation({
+    // No `stripUndefined` on the way out: an explicit `null` is how the API is told to clear a
+    // field, and stripping keys would silently turn "remove this phone number" into "leave it".
+    mutationFn: ({ id, input }: { id: number; input: UpdateSupplierInput }) =>
+      api.patch<Supplier>(`/api/suppliers/${id}`, input),
+    onSuccess: (updated) => {
+      client.setQueryData(queryKeys.entities.supplier(updated.id), updated);
+      invalidate();
+    },
+  });
+}
+
+export function useDeleteSupplier() {
+  const client = useQueryClient();
+  const invalidate = useInvalidateEntities();
+
+  return useMutation({
+    // A supplier referenced by any transaction comes back as a 409 with a readable message; the
+    // caller surfaces it rather than treating it as a failure to retry.
+    mutationFn: (id: number) => api.delete(`/api/suppliers/${id}`),
+    onSuccess: (_data, id) => {
+      client.removeQueries({ queryKey: queryKeys.entities.supplier(id) });
+      invalidate();
+    },
+  });
+}
+
+export function useProduct(id: number | undefined) {
+  return useQuery({
+    queryKey: queryKeys.entities.product(id ?? -1),
+    queryFn: () => api.get<Product>(`/api/products/${id}`),
+    enabled: id !== undefined && Number.isFinite(id),
+  });
+}
+
+export function useCreateProduct() {
+  const invalidate = useInvalidateEntities();
+
+  return useMutation({
+    mutationFn: (input: CreateProductInput) =>
+      api.post<Product>('/api/products', stripUndefined({ ...input })),
+    onSuccess: invalidate,
+  });
+}
+
+export function useUpdateProduct() {
+  const client = useQueryClient();
+  const invalidate = useInvalidateEntities();
+
+  return useMutation({
+    mutationFn: ({ id, input }: { id: number; input: UpdateProductInput }) =>
+      api.patch<Product>(`/api/products/${id}`, input),
+    onSuccess: (updated) => {
+      client.setQueryData(queryKeys.entities.product(updated.id), updated);
+      invalidate();
+    },
+  });
+}
+
+export function useDeleteProduct() {
+  const client = useQueryClient();
+  const invalidate = useInvalidateEntities();
+
+  return useMutation({
+    mutationFn: (id: number) => api.delete(`/api/products/${id}`),
+    onSuccess: (_data, id) => {
+      client.removeQueries({ queryKey: queryKeys.entities.product(id) });
+      invalidate();
+    },
   });
 }
 
