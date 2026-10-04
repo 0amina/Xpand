@@ -93,6 +93,36 @@ export interface CreateBotOptions {
 export function createBot(token: string, options: CreateBotOptions = {}): Bot {
   const bot = options.botInfo ? new Bot(token, { botInfo: options.botInfo }) : new Bot(token);
 
+  /**
+   * Error boundary, registered first so it wraps every handler below.
+   *
+   * This has to be middleware rather than `bot.catch`, because `bot.catch` is consulted on
+   * **one** of the two transports. grammy's `handleUpdates` — the long-polling loop — routes a
+   * failed update to the registered error handler, but `handleUpdate`, which is what
+   * `webhookCallback` calls, rethrows as a `BotError` instead. Under webhooks the throw therefore
+   * escapes into the HTTP layer.
+   *
+   * On a serverless host that was not a logged warning but a hang: the rejection surfaced as an
+   * unhandled rejection with no response written, so the function ran to its 60-second limit and
+   * Telegram got a 504 — which it retries, re-running a failure that will never succeed. A
+   * deterministic error like "user blocked the bot" would loop indefinitely.
+   *
+   * Catching here means `handleUpdate` resolves normally on both transports, so the webhook
+   * answers 200 and the update is not redelivered. `bot.catch` below is kept as a backstop for
+   * anything thrown outside this stack.
+   */
+  bot.use(async (ctx, next) => {
+    try {
+      await next();
+    } catch (err) {
+      logger.error({ err, update: ctx.update.update_id }, 'Unhandled error in bot handler');
+      // Best-effort: if the failure was itself an inability to message this chat, this fails too.
+      await ctx
+        .reply('Something went wrong handling that. Please try again.')
+        .catch(() => undefined);
+    }
+  });
+
   // ---------------------------------------------------------------- /start
 
   bot.command('start', async (ctx) => {
@@ -417,8 +447,10 @@ export function createBot(token: string, options: CreateBotOptions = {}): Bot {
   });
 
   /**
-   * Last line of defence. An uncaught throw inside a handler would otherwise bubble into
-   * grammy's poller and, in the worst case, stop the bot — while the user sees only silence.
+   * Backstop for the long-polling transport only — see the error-boundary middleware at the top
+   * of this function, which is what actually catches handler errors on both transports. This
+   * remains for anything grammy raises outside the middleware stack while polling, where an
+   * uncaught throw can stop the poller and leave the user looking at silence.
    */
   bot.catch((err) => {
     logger.error(

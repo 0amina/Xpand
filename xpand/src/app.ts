@@ -6,6 +6,7 @@ import helmet from 'helmet';
 import './utils/serialization.js';
 
 import { env } from './config/env.js';
+import { logger } from './config/logger.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { notFoundHandler } from './middleware/notFound.js';
 import { rateLimiter } from './middleware/rateLimiter.js';
@@ -72,19 +73,36 @@ export function createApp(): Application {
    */
   app.post(WEBHOOK_PATH, (req, res, next) => {
     void (async () => {
-      let handler;
       try {
-        handler = await botWebhookHandler();
-      } catch (err) {
-        next(err);
-        return;
-      }
+        const handler = await botWebhookHandler();
 
-      if (!handler) {
-        res.status(404).json({ error: { message: 'Webhook mode is not enabled', statusCode: 404 } });
-        return;
+        if (!handler) {
+          res
+            .status(404)
+            .json({ error: { message: 'Webhook mode is not enabled', statusCode: 404 } });
+          return;
+        }
+
+        await handler(req, res, next);
+      } catch (err) {
+        /*
+         * Nothing may escape this promise.
+         *
+         * An unhandled rejection here writes no response at all, so the request hangs until the
+         * platform kills it — 60 seconds on Vercel — and Telegram reads that 504 as "retry",
+         * re-running a failure that may never succeed. The bot's own error boundary already
+         * catches handler faults; this covers what is thrown around it (a failed lazy `init()`,
+         * a body grammy cannot parse).
+         *
+         * Answering 200 rather than 500 is deliberate: the fault is ours, not a transport
+         * problem, so redelivering the same update cannot fix it. The update is dropped and
+         * recorded instead — the user can reissue the command.
+         */
+        logger.error({ err }, 'Telegram webhook failed — acknowledging so it is not redelivered');
+        if (!res.headersSent) {
+          res.status(200).json({ ok: true });
+        }
       }
-      await handler(req, res, next);
     })();
   });
 

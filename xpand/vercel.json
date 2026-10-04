@@ -5,7 +5,7 @@
   "functions": {
     "api/index.js": {
       "maxDuration": 60,
-      "includeFiles": "node_modules/tesseract.js/src/**,node_modules/tesseract.js-core/package.json,node_modules/tesseract.js-core/index.js,node_modules/tesseract.js-core/*lstm*"
+      "includeFiles": "node_modules/tesseract.js*/**"
     }
   },
   "rewrites": [{ "source": "/(.*)", "destination": "/api" }]

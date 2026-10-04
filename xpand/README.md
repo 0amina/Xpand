@@ -615,11 +615,18 @@ Both are listed explicitly in `vercel.json` instead. Without them the deploy suc
 works, and OCR fails at the first upload with a module-not-found error from inside a worker
 thread — which is a long way from the cause.
 
-Only the `*lstm*` cores are included, not all eight variants: `ocr.ts` calls `createWorker` with
-`oem = 1` (`LSTM_ONLY`), and `worker-script/node/getCore.js` can only reach an `-lstm` build on
-that branch. That is 20 MB rather than 44 MB, which matters because Prisma's query engine already
-spends a large share of the 250 MB unzipped function budget. If the OEM ever changes, widen the
-glob to `node_modules/tesseract.js-core/**`.
+The whole of `tesseract.js-core` is included — all eight core variants, 44 MB — rather than a
+subset. Narrowing it to the `*lstm*` builds looks safe from reading
+`worker-script/node/getCore.js`, which only reaches an `-lstm` core when the OEM is `DEFAULT` or
+`LSTM_ONLY`, and `ocr.ts` does pass `oem = 1` (`LSTM_ONLY`). It is not safe: in practice the
+deployed worker loaded `tesseract-core-relaxedsimd.js`, the **non**-LSTM build.
+
+The failure that produces is worth recognising, because it does not look like a missing file.
+Static tracing had already pulled in all six `.js` cores (the `require` calls in `getCore.js` are
+literal strings), so only the `.wasm` sibling was absent. Emscripten's loader reports
+`failed to asynchronously prepare wasm` and aborts — **on the worker thread**, where nothing
+catches it — so the request simply never completes and the function dies at its `maxDuration`
+with a 504. It reads exactly like OCR being too slow for the platform.
 
 ## What's next
 
