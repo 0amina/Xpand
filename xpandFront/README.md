@@ -6,14 +6,14 @@ cash position. It pairs with the [`xpand`](../xpand) backend and is built around
 
 ## Overview
 
-| | |
-| --- | --- |
-| **Framework** | React 19 + TypeScript (strict) |
-| **Build** | Vite 6 |
-| **Data** | TanStack Query v5 |
-| **Routing** | React Router v7 |
-| **Styling** | Plain CSS with design tokens — no UI framework |
-| **Telegram** | `telegram-web-app.js` via CDN, wrapped in [`src/lib/telegram.ts`](src/lib/telegram.ts) |
+|               |                                                                                        |
+| ------------- | -------------------------------------------------------------------------------------- |
+| **Framework** | React 19 + TypeScript (strict)                                                         |
+| **Build**     | Vite 6                                                                                 |
+| **Data**      | TanStack Query v5                                                                      |
+| **Routing**   | React Router v7                                                                        |
+| **Styling**   | Plain CSS with design tokens — no UI framework                                         |
+| **Telegram**  | `telegram-web-app.js` via CDN, wrapped in [`src/lib/telegram.ts`](src/lib/telegram.ts) |
 
 No component library and no CSS framework, deliberately: a Mini App has to adopt Telegram's
 theme (which the user can change at runtime, in either light or dark), and shipping a design
@@ -35,25 +35,25 @@ change is needed for local work.
 
 ### Scripts
 
-| Script | What it does |
-| --- | --- |
-| `npm run dev` | Vite dev server with HMR on port 5173. |
-| `npm run build` | Type-check (`tsc -b`) then bundle to `dist/`. |
-| `npm run preview` | Serve the production build on port 4173. |
-| `npm run typecheck` | Types only, no emit. |
-| `npm run lint` | ESLint over the whole project. |
-| `npm run format` | Prettier. |
+| Script              | What it does                                  |
+| ------------------- | --------------------------------------------- |
+| `npm run dev`       | Vite dev server with HMR on port 5173.        |
+| `npm run build`     | Type-check (`tsc -b`) then bundle to `dist/`. |
+| `npm run preview`   | Serve the production build on port 4173.      |
+| `npm run typecheck` | Types only, no emit.                          |
+| `npm run lint`      | ESLint over the whole project.                |
+| `npm run format`    | Prettier.                                     |
 
 ### Environment variables
 
 Only `VITE_`-prefixed variables reach the browser, and **everything here ships inside the JS
 bundle** — never put a secret in it.
 
-| Variable | Default | Description |
-| --- | --- | --- |
-| `VITE_API_BASE_URL` | `http://localhost:3000` | Backend origin. |
-| `VITE_DEV_TELEGRAM_ID` | — | Dev only. Skips the sign-in screen and boots as this Telegram id. Ignored inside Telegram. |
-| `VITE_DEV_FIRST_NAME` | `Dev` | Name used if `VITE_DEV_TELEGRAM_ID` is new to the backend. |
+| Variable               | Default                 | Description                                                                                |
+| ---------------------- | ----------------------- | ------------------------------------------------------------------------------------------ |
+| `VITE_API_BASE_URL`    | `http://localhost:3000` | Backend origin.                                                                            |
+| `VITE_DEV_TELEGRAM_ID` | —                       | Dev only. Skips the sign-in screen and boots as this Telegram id. Ignored inside Telegram. |
+| `VITE_DEV_FIRST_NAME`  | `Dev`                   | Name used if `VITE_DEV_TELEGRAM_ID` is new to the backend.                                 |
 
 Vite **inlines these at build time**, so changing one on the host does nothing until the app is
 rebuilt. On Vercel that means a redeploy, not just an edit in the dashboard — the single most
@@ -105,17 +105,17 @@ branch on.
 
 ## Screens
 
-| Route | Screen |
-| --- | --- |
-| `/` | Dashboard — cash position, today's in/out/net, this month, quick actions, recent transactions |
-| `/add/income` | Add income |
-| `/add/expense` | Add expense (adds supplier / product / packaging, and an invoice reference) |
-| `/transactions` | History — filter by type, date range, category; grouped by day with daily nets |
-| `/transactions/:id` | Detail — every field, edit, delete |
-| `/transactions/:id/edit` | Edit |
-| `/invoices` | Invoice queue — what is uploaded, what still needs reviewing |
-| `/invoices/scan` | Photograph or pick an invoice and upload it |
-| `/invoices/:id/review` | **The verification step** — check what OCR read, then save |
+| Route                    | Screen                                                                                        |
+| ------------------------ | --------------------------------------------------------------------------------------------- |
+| `/`                      | Dashboard — cash position, today's in/out/net, this month, quick actions, recent transactions |
+| `/add/income`            | Add income                                                                                    |
+| `/add/expense`           | Add expense (adds supplier / product / packaging, and an invoice reference)                   |
+| `/transactions`          | History — filter by type, date range, category; grouped by day with daily nets                |
+| `/transactions/:id`      | Detail — every field, edit, delete                                                            |
+| `/transactions/:id/edit` | Edit                                                                                          |
+| `/invoices`              | Invoice queue — what is uploaded, what still needs reviewing                                  |
+| `/invoices/scan`         | Photograph or pick an invoice and upload it                                                   |
+| `/invoices/:id/review`   | **The verification step** — check what OCR read, then save                                    |
 
 ### Why four tabs instead of three
 
@@ -153,7 +153,7 @@ normalises both. User ids are strings too (`users.id` is a BIGINT); never coerce
 number.
 
 **Dates are pinned to the client's day.** `transaction_date` is a SQL `DATE`, and the backend
-computes report boundaries in UTC from the *server* clock. Without intervention, a user in
+computes report boundaries in UTC from the _server_ clock. Without intervention, a user in
 Tunisia (UTC+1) logging at 00:30 would see yesterday's totals above a form filing under today's
 date. The dashboard therefore always sends `?on=<local today>` to `/api/reports/summary`. See
 the notes in [`src/lib/format.ts`](src/lib/format.ts).
@@ -170,12 +170,25 @@ Photograph an invoice, check what was read off it, save. The flow:
                               Save → transaction created
 ```
 
-Three decisions worth knowing about:
+Four decisions worth knowing about:
+
+**The camera is in-app, not a file picker.** `/invoices/scan` opens a real `getUserMedia` stream
+([`CameraSheet`](src/features/invoices/CameraSheet.tsx)) with a confirm-or-retake step, and only
+falls back to `<input type="file">` when a stream is impossible — an insecure origin, an iframe
+without camera permission, a refused prompt. The screen used to rely on
+`<input type="file" capture="environment">` alone, and that is why "take a photo" reached the
+gallery instead: `capture` is a _hint_, and Telegram's Android webview commonly ignores it and
+opens the document picker. A narrow `accept` list made it worse, so the inputs now accept
+`image/*`. The confirm step is not ceremony either — a blurred page comes back as a draft with
+missing fields, which is far more expensive to discover after the upload.
 
 **The photo is uploaded at full resolution.** Every other image path in this app compresses hard;
 this one deliberately does not. Tesseract's accuracy falls off sharply below roughly 1000 px on the
 long edge, so shrinking the one image the scanner exists to read would defeat the feature. The
-ceiling is the backend's 10 MB.
+ceiling is the backend's 10 MB, and the only images that get re-encoded are the ones that would
+otherwise be refused outright — an iOS HEIC, or a frame over that ceiling — which
+`transcodeToJpeg` in [`src/lib/image.ts`](src/lib/image.ts) caps at 2600 px rather than at the
+1400 px the expense form used.
 
 **The review screen shows the raw text beside every value.** `458.15` is rendered next to
 `Net a payer : 458,150`. This is not decoration: the backend's amount parser has to resolve a real
@@ -198,7 +211,7 @@ back an object URL; `InvoiceImage` owns revoking it.
 
 Before this existed, the expense form captured a photo and parked it in `localStorage`, with a
 warning on every surface saying it had never been uploaded. Those warnings are gone, and the capture
-moved to the scanner — the OCR flow runs the other way round, creating the expense *from* the
+moved to the scanner — the OCR flow runs the other way round, creating the expense _from_ the
 invoice rather than alongside it.
 
 Attachments still sitting on a device are not abandoned: `/invoices` shows a notice offering to
@@ -268,7 +281,7 @@ Scoped out, matching the backend's own status:
 - **Invoice line items.** Only the five header fields are extracted (supplier, date, total,
   currency, invoice number). Per-line products, quantities, prices and VAT are the natural next
   step; `ocr_extracted_data` is JSONB and versioned for exactly that.
-- **CRUD screens** for suppliers / products / packaging. The app *reads* all three for the
+- **CRUD screens** for suppliers / products / packaging. The app _reads_ all three for the
   expense pickers; the API accepts writes from anyone, but there is no UI for them yet.
 - **Category management.** Same: the endpoints are open, the screens do not exist.
 - **Reports beyond the dashboard.** `/api/reports/by-category` is wired up as a hook

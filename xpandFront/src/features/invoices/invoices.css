@@ -199,3 +199,116 @@
   white-space: nowrap;
   border: 0;
 }
+
+/* --- In-app camera ------------------------------------------------------------------------- */
+/*
+ * Deliberately not themed: a viewfinder wants to be black in light mode too, so the photo is
+ * the only thing on screen carrying colour. The controls below it are the one surface in the
+ * app that ignores `--tg-theme-*` for that reason.
+ */
+
+.camera {
+  position: fixed;
+  inset: 0;
+  /* Above the sheet layer (101) — the camera can be opened from inside one. */
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  background: #000;
+}
+
+.camera__stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.camera__video,
+.camera__still {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  /* `contain`, not `cover`: a cropped preview would hide the edge of the invoice that the user
+     is trying to line up, and the capture is of the full frame regardless. */
+  object-fit: contain;
+  background: #000;
+}
+
+.camera__still {
+  z-index: 2;
+}
+
+.camera__overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--x-space-3);
+  padding: var(--x-space-5);
+  text-align: center;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.72);
+  font-size: var(--x-text-sm);
+}
+
+.camera__overlay--error {
+  background: rgba(0, 0, 0, 0.88);
+}
+
+.camera__message {
+  max-width: 320px;
+  line-height: 1.5;
+}
+
+/* Aiming frame. Roughly A4 in portrait, which is what an invoice is. */
+.camera__guide {
+  position: absolute;
+  top: 8%;
+  bottom: 8%;
+  left: 6%;
+  right: 6%;
+  border: 2px dashed rgba(255, 255, 255, 0.5);
+  border-radius: var(--x-radius-md);
+  pointer-events: none;
+}
+
+.camera__controls {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: var(--x-space-3);
+  padding: var(--x-space-4);
+  padding-bottom: calc(var(--x-space-4) + var(--x-safe-bottom));
+  background: #000;
+}
+
+.camera__text-action {
+  color: #fff;
+  font-size: var(--x-text-base);
+  font-weight: 500;
+  padding: var(--x-space-2);
+  text-align: center;
+}
+
+.camera__shutter {
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  background: #fff;
+  border: 4px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 0 0 0 2px #000 inset;
+  transition: transform 80ms ease-out;
+}
+
+.camera__shutter:active {
+  transform: scale(0.92);
+}
+
+.camera__shutter:disabled {
+  opacity: 0.4;
+}

@@ -84,6 +84,14 @@ window.URL.revokeObjectURL = () => {};
 window.Element.prototype.scrollTo = () => {};
 window.scrollTo = () => {};
 
+/**
+ * The last multipart upload the bundle attempted.
+ *
+ * Captured rather than forwarded: the camera section below shoots a stub frame, and posting it
+ * for real would leave an unreadable invoice sitting in the live queue for someone to clear.
+ */
+let lastUpload = null;
+
 /** Minimal XHR so `api.upload` can run; the bundle uses it for upload progress. */
 class StubXHR {
   constructor() {
@@ -103,6 +111,17 @@ class StubXHR {
     this._listeners[type] = fn;
   }
   send(body) {
+    // Invoice uploads are answered locally; everything else still hits the real API.
+    if (this._method === 'POST' && /\/api\/invoices$/.test(this._url)) {
+      lastUpload = { file: body?.get?.('file') ?? null };
+      this.status = 201;
+      this.responseText = JSON.stringify({
+        data: { id: 999999, status: 'PENDING', draft: null },
+      });
+      setTimeout(() => this._listeners.load?.(), 0);
+      return;
+    }
+
     fetch(this._url, { method: this._method, headers: this._headers, body })
       .then(async (res) => {
         this.status = res.status;
@@ -113,6 +132,41 @@ class StubXHR {
   }
 }
 window.XMLHttpRequest = StubXHR;
+
+// --- Camera stubs -----------------------------------------------------------------------------
+// jsdom has neither `mediaDevices` nor a canvas, so the in-app scanner's two hard dependencies
+// are faked at the narrowest possible point: a stream that yields one stoppable track, and a 2D
+// context that swallows the draw. Everything above them — the phase machine, the frame grab, the
+// confirm step, the handoff to the uploader — is the real bundle.
+
+const stoppedTracks = [];
+Object.defineProperty(window.navigator, 'mediaDevices', {
+  configurable: true,
+  value: {
+    getUserMedia: async () => ({
+      getTracks: () => [{ kind: 'video', stop: () => stoppedTracks.push(1) }],
+    }),
+  },
+});
+
+window.HTMLVideoElement.prototype.play = async () => {};
+for (const [prop, value] of [
+  ['videoWidth', 1536],
+  ['videoHeight', 2048],
+]) {
+  Object.defineProperty(window.HTMLVideoElement.prototype, prop, {
+    configurable: true,
+    get: () => value,
+  });
+}
+
+window.HTMLCanvasElement.prototype.getContext = () => ({
+  fillStyle: '',
+  fillRect: () => {},
+  drawImage: () => {},
+});
+window.HTMLCanvasElement.prototype.toBlob = (callback) =>
+  callback(new Blob([new Uint8Array(4096)], { type: 'image/jpeg' }));
 
 console.log(`\nLoading bundle ${jsAsset} in jsdom…`);
 window.eval(bundle);
@@ -147,8 +201,56 @@ check(
   /Scan an invoice|Take a photo/i.test(text()),
   text().slice(0, 140),
 );
-check('states the accepted formats', /JPEG|PNG|WebP/i.test(text()));
+check(
+  'offers both a camera and the gallery',
+  /Take a photo/i.test(text()) && /existing photo/i.test(text()),
+);
 check('says PDFs are unsupported', /PDF/i.test(text()));
+
+// --- The in-app camera ----------------------------------------------------------------------
+// The regression this guards: "Take a photo" used to be a `<input capture=environment>` click,
+// which Telegram's Android webview answers with the document picker. It must now open a real
+// stream, and the shot must reach the uploader as a JPEG.
+
+console.log('\n/invoices/scan — the camera');
+const byText = (selector, pattern) =>
+  [...window.document.querySelectorAll(selector)].find((el) => pattern.test(el.textContent ?? ''));
+
+byText('button', /Take a photo/i)?.click();
+await settle(400);
+
+check('the camera opened in-app', Boolean(window.document.querySelector('.camera')));
+check('a live preview is mounted', Boolean(window.document.querySelector('video.camera__video')));
+check(
+  'no camera error shown',
+  !/could not be opened|was refused/i.test(text()),
+  text().slice(-160),
+);
+
+const shutter = window.document.querySelector('.camera__shutter');
+check('the shutter is enabled once live', Boolean(shutter) && !shutter.disabled);
+
+shutter?.click();
+await settle(400);
+
+check('the shot is offered for review', /Use this photo/i.test(text()) && /Retake/i.test(text()));
+check('the still is shown', Boolean(window.document.querySelector('img.camera__still')));
+
+byText('button', /Use this photo/i)?.click();
+await settle(600);
+
+check('the camera closed after accepting', !window.document.querySelector('.camera'));
+check('the camera was released', stoppedTracks.length > 0);
+check(
+  'a JPEG reached the uploader',
+  lastUpload?.file?.type === 'image/jpeg',
+  String(lastUpload?.file?.type),
+);
+check(
+  'the upload carries bytes',
+  (lastUpload?.file?.size ?? 0) > 0,
+  String(lastUpload?.file?.size),
+);
 
 console.log('\n/ — the dashboard still renders');
 window.history.pushState({}, '', '/');

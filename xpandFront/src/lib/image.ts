@@ -79,3 +79,111 @@ async function loadBitmap(file: File): Promise<ImageBitmap | HTMLImageElement> {
     URL.revokeObjectURL(url);
   }
 }
+
+/**
+ * Longest edge of a *scanned* image. Much larger than `MAX_DIMENSION` above: this path feeds
+ * OCR rather than a `localStorage` queue, and Tesseract's accuracy falls off sharply once the
+ * characters on an invoice drop below roughly 20px tall.
+ */
+const SCAN_MAX_DIMENSION = 2600;
+const SCAN_JPEG_QUALITY = 0.92;
+
+/**
+ * Re-encode an image file as a JPEG the invoices API will accept.
+ *
+ * Two cases need it, and both come from the camera rather than from anything the app controls:
+ * an iOS photo that arrives as HEIC, which the backend cannot read at all, and a 12 MP frame
+ * that is over the upload ceiling. Rejecting either with a toast was the old behaviour and left
+ * the user with nothing to do about it.
+ *
+ * Resolves to `null` when the file cannot be decoded here, so the caller can still fall back to
+ * uploading the original and letting the server have the final say.
+ */
+export async function transcodeToJpeg(file: File): Promise<File | null> {
+  let bitmap: ImageBitmap | HTMLImageElement;
+  try {
+    bitmap = await loadBitmap(file);
+  } catch {
+    return null;
+  }
+
+  const source = bitmap as unknown as { width: number; height: number };
+  const scale = Math.min(1, SCAN_MAX_DIMENSION / Math.max(source.width, source.height));
+  const width = Math.round(source.width * scale);
+  const height = Math.round(source.height * scale);
+
+  const blob = await drawToJpeg(bitmap, width, height, SCAN_JPEG_QUALITY);
+  if (!blob) return null;
+
+  const base = file.name.replace(/\.[^.]+$/, '') || 'invoice';
+  return new File([blob], `${base}.jpg`, { type: 'image/jpeg' });
+}
+
+/**
+ * Whether this runtime can open a camera stream at all.
+ *
+ * `navigator.mediaDevices` is absent outside a secure context (plain `http://`, which is how the
+ * app runs on a LAN address during development) and in jsdom. Checked before the scanner's camera
+ * button is wired up, so the file-picker path stays the one offered when a live preview is
+ * impossible rather than being reached through an error.
+ */
+export function cameraStreamSupported(): boolean {
+  return (
+    typeof navigator !== 'undefined' && typeof navigator.mediaDevices?.getUserMedia === 'function'
+  );
+}
+
+/**
+ * Capture one frame of a live camera stream as a JPEG file.
+ *
+ * Used by the in-app scanner, which draws the `<video>` element the stream is playing into
+ * rather than going through a file picker — see `CameraSheet`.
+ */
+export async function frameToJpegFile(
+  video: HTMLVideoElement,
+  filename = 'invoice.jpg',
+): Promise<File> {
+  const scale = Math.min(
+    1,
+    SCAN_MAX_DIMENSION / Math.max(video.videoWidth, video.videoHeight || 1),
+  );
+  const width = Math.round(video.videoWidth * scale);
+  const height = Math.round(video.videoHeight * scale);
+
+  const blob = await drawToJpeg(video, width, height, SCAN_JPEG_QUALITY);
+  if (!blob) throw new Error('The photo could not be saved on this device.');
+
+  return new File([blob], filename, { type: 'image/jpeg' });
+}
+
+/** Shared canvas path for the two functions above. Flattens onto white, as `compressImage` does. */
+async function drawToJpeg(
+  source: CanvasImageSource,
+  width: number,
+  height: number,
+  quality: number,
+): Promise<Blob | null> {
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, width, height);
+  ctx.drawImage(source, 0, 0, width, height);
+
+  if (typeof source === 'object' && 'close' in source && typeof source.close === 'function') {
+    source.close();
+  }
+
+  // `toBlob` is absent in a few older webviews; fall back through the data URL.
+  if (typeof canvas.toBlob !== 'function') {
+    const dataUrl = canvas.toDataURL('image/jpeg', quality);
+    const response = await fetch(dataUrl);
+    return response.blob();
+  }
+
+  return new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', quality));
+}
