@@ -125,25 +125,22 @@ export function createBot(token: string, options: CreateBotOptions = {}): Bot {
 
   // ---------------------------------------------------------------- /start
 
+  /**
+   * Two lines on purpose.
+   *
+   * This used to greet the sender by their Telegram first name and then reprint most of /help
+   * under it. Both were wrong for the first thing a user ever sees: the account is shared in
+   * practice, so a personal greeting names whoever happened to open the chat rather than the
+   * company, and a screen of commands buries the only two facts that matter — what this bot is
+   * for, and that /help exists. The full list stayed exactly one command away.
+   */
   bot.command('start', async (ctx) => {
     const actor = await actorFrom(ctx);
-    const name = ctx.from?.first_name ?? 'there';
 
     const lines = [
-      `👋 Hi ${esc(name)}, welcome to <b>Xpand</b>.`,
+      `Hi Xpand user 👋`,
       ``,
-      `I track the company's cash position. Log money in and out from here, or open the app for anything more involved.`,
-      ``,
-      `<b>Quick logging</b>`,
-      `<code>/expense 250 transport taxi</code>`,
-      `<code>/income 1200 recettes</code>`,
-      ``,
-      `<b>Quick answers</b>`,
-      `/balance — cash position right now`,
-      `/today — today's money in and out`,
-      `/transactions — the latest entries`,
-      ``,
-      `/help for the full list.`,
+      `<b>Xpand</b> tracks the company's cash position — log money with <code>/expense</code> and <code>/income</code>, check it with /balance or /today, open the app for invoices and suppliers, and send /help for the full list.`,
     ];
 
     if (!isMiniAppConfigured()) {
