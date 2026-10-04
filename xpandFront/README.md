@@ -276,6 +276,12 @@ header. The backend is real, and so is everything above those seams.
 `Smoke Test …` and deleted again in a `finally` block, so a failed run does not leave litter —
 but point it at a local backend, not a production one.
 
+All three take an optional telegram id, and it should stay a **throwaway**. The dev sign-in path
+they use posts to `POST /api/users/login`, which upserts `first_name`, so running them as a real
+Telegram user renames that user to "Smoke". The default `111` is there for exactly this, and
+[`../xpand/scripts/seed.mjs`](../xpand/scripts/seed.mjs) clears it out again as a non-Telegram
+account.
+
 Run `npm run build` first; both read from `dist/`.
 
 ## Testing inside Telegram

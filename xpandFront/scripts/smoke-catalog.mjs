@@ -6,6 +6,11 @@
  * prefix below and removed again at the end, including on failure — nothing here is mocked except
  * the browser, so a half-run would otherwise leave litter in the catalog.
  *
+ *
+ * **Pass a throwaway id, never a real one.** The dev sign-in path this harness uses posts to
+ * `POST /api/users/login`, which upserts `first_name` — so running it as a real Telegram user
+ * renames that user to "Smoke". The default `111` exists for this; `scripts/seed.mjs` deletes it
+ * again as a non-Telegram account.
  * Usage:  node scripts/smoke-catalog.mjs [telegramId]
  */
 import { readFileSync, readdirSync } from 'node:fs';

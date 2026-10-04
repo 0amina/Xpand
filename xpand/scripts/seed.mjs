@@ -62,7 +62,18 @@ function makeRandom(seed) {
   };
 }
 
-const random = makeRandom(20261004);
+const SEED = 20261004;
+
+/**
+ * The live stream, reset at the top of every `buildLedger` call.
+ *
+ * It has to be reset rather than merely seeded once, because `buildLedger` runs **twice** per
+ * invocation: once against placeholder ids to print the plan, and once against the real ids to
+ * insert. Sharing one continuing stream meant the second call resumed where the first stopped
+ * and generated a different ledger — the dry run promised 209 rows and 192 were written. The dry
+ * run is only worth having if it is exactly what lands.
+ */
+let random = makeRandom(SEED);
 
 /** A money amount in `[min, max]`, rounded to the 2 decimals the column stores. */
 function money(min, max) {
@@ -237,9 +248,19 @@ const PRODUCT_PACKAGING = [
 
 // --- Ledger generation ------------------------------------------------------------------------
 
-/** The ledger runs from the first of the month three months back, up to today. */
-const LAST_DAY = new Date();
-const FIRST_DAY = new Date(Date.UTC(LAST_DAY.getUTCFullYear(), LAST_DAY.getUTCMonth() - 3, 1));
+/**
+ * The ledger runs from the first of the month three months back, up to today — where "today"
+ * means the **local** calendar day, not the UTC one.
+ *
+ * The two disagree for an hour either side of midnight in Tunisia (UTC+1), and it matters here:
+ * the Mini App sends `?on=<local today>` to the summary endpoint, so a ledger anchored to the UTC
+ * day would leave the dashboard's "Today" tiles reading zero whenever this is run late in the
+ * evening. The rows themselves are still stored at UTC midnight, like every other date in this
+ * codebase.
+ */
+const now = new Date();
+const LAST_DAY = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+const FIRST_DAY = new Date(Date.UTC(now.getFullYear(), now.getMonth() - 3, 1));
 
 /** A SQL DATE is read and written at UTC midnight everywhere else in this codebase. */
 function utcDay(date) {
@@ -270,6 +291,8 @@ const WHOLESALE_BUYERS = [
  * at month end, utilities mid-month, rent on the first.
  */
 function buildLedger({ categories, userIds, supplierIds, productIds, packagingIds }) {
+  random = makeRandom(SEED);
+
   const cat = (name) => {
     const found = categories.find((c) => c.name === name);
     if (!found) throw new Error(`Category "${name}" is missing — the seeded categories changed.`);
@@ -603,9 +626,29 @@ function buildLedger({ categories, userIds, supplierIds, productIds, packagingId
 // --- Run --------------------------------------------------------------------------------------
 
 const prisma = new PrismaClient();
-const dbHost = (process.env.DATABASE_URL ?? '').replace(/^[^@]*@/, '').split('/')[0] || '(unset)';
+const dbUrl = process.env.DATABASE_URL ?? '';
+const dbHost = dbUrl.replace(/^[^@]*@/, '').split('/')[0] || '(unset)';
 
 console.log(`\nTarget database: ${dbHost}`);
+
+/**
+ * Refuse the transaction pooler.
+ *
+ * Everything below runs inside one interactive transaction, which needs a session held open
+ * across statements. Supabase's pooler on **6543** is in transaction mode and hands a different
+ * backend to each statement, so the run would fail somewhere in the middle — after the deletes.
+ * The session pooler on **5432** behaves like a direct connection. (The app itself is the other
+ * way round: it wants 6543, because a serverless function should not hold a session.)
+ */
+if (/:6543|pgbouncer=true/.test(dbUrl)) {
+  console.error(
+    '\nRefusing to run against the transaction pooler (port 6543 / pgbouncer=true).\n' +
+      'This script needs one long transaction, so use the SESSION pooler instead:\n' +
+      '  postgresql://postgres.<ref>:<pw>@aws-1-<region>.pooler.supabase.com:5432/postgres\n',
+  );
+  await prisma.$disconnect();
+  process.exit(1);
+}
 console.log(
   APPLY
     ? 'Mode: APPLY — this will delete and rewrite data.\n'
@@ -701,61 +744,68 @@ const orphanedFiles = (await prisma.invoices.findMany({ select: { image_url: tru
   (i) => i.image_url,
 );
 
-await prisma.$transaction(async (tx) => {
-  // Order matters: links and invoices reference the rows below them.
-  await tx.invoices.deleteMany({});
-  await tx.transactions.deleteMany({});
-  await tx.supplier_products.deleteMany({});
-  await tx.supplier_packaging.deleteMany({});
-  await tx.product_packaging.deleteMany({});
-  await tx.suppliers.deleteMany({});
-  await tx.products.deleteMany({});
-  await tx.packaging.deleteMany({});
-  if (drop.length > 0) {
-    await tx.users.deleteMany({ where: { id: { in: drop.map((u) => u.id) } } });
-  }
+await prisma.$transaction(
+  async (tx) => {
+    // Order matters: links and invoices reference the rows below them.
+    await tx.invoices.deleteMany({});
+    await tx.transactions.deleteMany({});
+    await tx.supplier_products.deleteMany({});
+    await tx.supplier_packaging.deleteMany({});
+    await tx.product_packaging.deleteMany({});
+    await tx.suppliers.deleteMany({});
+    await tx.products.deleteMany({});
+    await tx.packaging.deleteMany({});
+    if (drop.length > 0) {
+      await tx.users.deleteMany({ where: { id: { in: drop.map((u) => u.id) } } });
+    }
 
-  const supplierIds = {};
-  for (const { key, ...data } of SUPPLIERS) {
-    supplierIds[key] = (await tx.suppliers.create({ data, select: { id: true } })).id;
-  }
-  const productIds = {};
-  for (const { key, ...data } of PRODUCTS) {
-    productIds[key] = (await tx.products.create({ data, select: { id: true } })).id;
-  }
-  const packagingIds = {};
-  for (const { key, ...data } of PACKAGING) {
-    packagingIds[key] = (await tx.packaging.create({ data, select: { id: true } })).id;
-  }
+    const supplierIds = {};
+    for (const { key, ...data } of SUPPLIERS) {
+      supplierIds[key] = (await tx.suppliers.create({ data, select: { id: true } })).id;
+    }
+    const productIds = {};
+    for (const { key, ...data } of PRODUCTS) {
+      productIds[key] = (await tx.products.create({ data, select: { id: true } })).id;
+    }
+    const packagingIds = {};
+    for (const { key, ...data } of PACKAGING) {
+      packagingIds[key] = (await tx.packaging.create({ data, select: { id: true } })).id;
+    }
 
-  await tx.supplier_products.createMany({
-    data: SUPPLIER_PRODUCTS.map(([s, p, price]) => ({
-      supplier_id: supplierIds[s],
-      product_id: productIds[p],
-      unit_price: price,
-    })),
-  });
-  await tx.supplier_packaging.createMany({
-    data: SUPPLIER_PACKAGING.map(([s, k, price]) => ({
-      supplier_id: supplierIds[s],
-      packaging_id: packagingIds[k],
-      unit_price: price,
-    })),
-  });
-  await tx.product_packaging.createMany({
-    data: PRODUCT_PACKAGING.map(([p, k, quantity]) => ({
-      product_id: productIds[p],
-      packaging_id: packagingIds[k],
-      quantity,
-    })),
-  });
+    await tx.supplier_products.createMany({
+      data: SUPPLIER_PRODUCTS.map(([s, p, price]) => ({
+        supplier_id: supplierIds[s],
+        product_id: productIds[p],
+        unit_price: price,
+      })),
+    });
+    await tx.supplier_packaging.createMany({
+      data: SUPPLIER_PACKAGING.map(([s, k, price]) => ({
+        supplier_id: supplierIds[s],
+        packaging_id: packagingIds[k],
+        unit_price: price,
+      })),
+    });
+    await tx.product_packaging.createMany({
+      data: PRODUCT_PACKAGING.map(([p, k, quantity]) => ({
+        product_id: productIds[p],
+        packaging_id: packagingIds[k],
+        quantity,
+      })),
+    });
 
-  // Rebuilt with the real ids now that the catalogue exists.
-  const ledger = buildLedger({ categories, userIds, supplierIds, productIds, packagingIds });
-  await tx.transactions.createMany({
-    data: ledger.map((r) => ({ ...r, currency: 'TND' })),
-  });
-});
+    // Rebuilt with the real ids now that the catalogue exists.
+    const ledger = buildLedger({ categories, userIds, supplierIds, productIds, packagingIds });
+    await tx.transactions.createMany({
+      data: ledger.map((r) => ({ ...r, currency: 'TND' })),
+    });
+  },
+  // Prisma's default interactive-transaction budget is five seconds, which is ample against
+  // localhost and nowhere near enough against a hosted database: this does eight deletes, nineteen
+  // creates and four bulk inserts, each a round trip. Timing out mid-way would roll back cleanly,
+  // but only after wasting the run, so the ceiling is raised rather than discovered.
+  { timeout: 180_000, maxWait: 30_000 },
+);
 
 // Remove the files the deleted invoices pointed at, when they are on this machine's disk.
 const uploadDir = path.resolve(process.env.UPLOAD_DIR || './uploads/invoices');
