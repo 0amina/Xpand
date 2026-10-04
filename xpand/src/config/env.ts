@@ -34,6 +34,26 @@ const corsOriginsSchema = z
 const blankToUndefined = (value: unknown): unknown =>
   typeof value === 'string' && value.trim() === '' ? undefined : value;
 
+/**
+ * Whether we are running as a serverless function rather than a long-lived server.
+ *
+ * Vercel sets `VERCEL=1` in every build and runtime environment. This flag decides three
+ * defaults further down that would otherwise each need configuring by hand, and every one of
+ * them is a silent failure if it is wrong:
+ *
+ *  - writable paths move under `/tmp`, the only directory that is not read-only;
+ *  - invoice files go to object storage, because `/tmp` does not survive the invocation;
+ *  - OCR runs inside the request, because the instance is frozen once a response is sent.
+ *
+ * Read from `process.env` directly: it is needed to build the schema's defaults, so it cannot
+ * come from the parsed output.
+ */
+export const isServerless = process.env.VERCEL === '1' || process.env.VERCEL === 'true';
+
+/** The only writable location on a serverless host, and ephemeral even there. */
+const writableDir = (relative: string): string =>
+  isServerless ? `/tmp/${relative.replace(/^\.?\//, '')}` : relative;
+
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
 
@@ -90,7 +110,29 @@ const envSchema = z.object({
    * always served through `GET /api/invoices/:id/file`, never as static assets, so that the
    * auth middleware sits in front of them.
    */
-  UPLOAD_DIR: z.string().min(1).default('./uploads/invoices'),
+  UPLOAD_DIR: z.string().min(1).default(writableDir('./uploads/invoices')),
+
+  /**
+   * Which storage backend holds invoice files: `disk` or `supabase`.
+   *
+   * Defaults to `supabase` when a `SUPABASE_URL` is configured and `disk` otherwise, which makes
+   * local development need no setting at all and production need no extra one. Set it explicitly
+   * to pin the choice — notably `STORAGE_DRIVER=disk` with Supabase credentials present, if you
+   * want local files while still talking to the hosted database.
+   */
+  STORAGE_DRIVER: z.preprocess(blankToUndefined, z.enum(['disk', 'supabase']).optional()),
+
+  /** Supabase project URL, e.g. https://abcdefgh.supabase.co. Required by the supabase driver. */
+  SUPABASE_URL: z.preprocess(blankToUndefined, z.string().url().optional()),
+
+  /**
+   * Supabase `service_role` key. **Bypasses row-level security by design** — it is the server's
+   * key and must never reach the browser. It is only ever read by `invoices/storage.ts`.
+   */
+  SUPABASE_SERVICE_ROLE_KEY: z.preprocess(blankToUndefined, z.string().min(20).optional()),
+
+  /** Storage bucket for invoice files. Must be created **private**; see the README. */
+  SUPABASE_STORAGE_BUCKET: z.string().min(1).default('invoices'),
 
   /** Hard ceiling on a single invoice upload. Phone photos are typically 2-6 MB. */
   MAX_UPLOAD_MB: z.coerce.number().positive().max(50).default(10),
@@ -107,7 +149,24 @@ const envSchema = z.object({
    * into the process CWD — i.e. the repo root. First OCR needs network access to fetch them;
    * afterwards it runs fully offline.
    */
-  TESSDATA_DIR: z.string().min(1).default('./.tessdata'),
+  TESSDATA_DIR: z.string().min(1).default(writableDir('./.tessdata')),
+
+  /**
+   * Whether OCR runs *inside* the upload request instead of after the response.
+   *
+   * Fire-and-forget is the better shape on a long-lived server: the upload returns in
+   * milliseconds and the client polls for `status`. On a serverless host it does not work at all
+   * — the instance is frozen as soon as the response is written, so the pipeline would be killed
+   * mid-read and every invoice would sit in PENDING for ever.
+   *
+   * Defaults to on when serverless, off otherwise. The trade-off is a slow upload (OCR takes a
+   * few seconds per page) in exchange for a response that already carries the finished draft.
+   */
+  OCR_SYNC: z.preprocess(
+    // Same `.default()`-inside-preprocess placement as OCR_ENABLED below, for the same reason.
+    (v) => (typeof v === 'string' ? !/^(false|0|no|off)$/i.test(v.trim()) : v),
+    z.boolean().default(isServerless),
+  ),
 
   /**
    * Turn OCR off while still accepting uploads. Invoices then land in `FAILED` with an
@@ -167,6 +226,39 @@ function parseEnv(): Env {
     process.exit(1);
   }
 
+  /*
+   * Storage guard.
+   *
+   * Asking for the Supabase driver without credentials would fail at the first upload, with the
+   * user's photo already buffered and nowhere to put it. Catch it at boot instead.
+   */
+  const wantsSupabase =
+    parsed.STORAGE_DRIVER === 'supabase' ||
+    (parsed.STORAGE_DRIVER === undefined && Boolean(parsed.SUPABASE_URL));
+
+  if (wantsSupabase && !(parsed.SUPABASE_URL && parsed.SUPABASE_SERVICE_ROLE_KEY)) {
+    // eslint-disable-next-line no-console -- same reason.
+    console.error(
+      '\n✖ The supabase storage driver needs both SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.\n' +
+        '  Set STORAGE_DRIVER=disk to store invoice files on the local filesystem instead.\n',
+    );
+    process.exit(1);
+  }
+
+  /*
+   * The disk driver cannot work on a serverless host: the filesystem is read-only apart from
+   * `/tmp`, and `/tmp` is gone by the time the user opens the review screen. Uploads would
+   * appear to succeed and then 404, which is far worse than refusing to start.
+   */
+  if (isServerless && !wantsSupabase) {
+    // eslint-disable-next-line no-console -- same reason.
+    console.error(
+      '\n✖ Invoice files cannot be stored on disk on a serverless host — the filesystem does not\n' +
+        '  persist between invocations. Configure SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.\n',
+    );
+    process.exit(1);
+  }
+
   return parsed;
 }
 
@@ -179,7 +271,14 @@ export const env: Env = Object.freeze(parseEnv());
  */
 export const botMode: 'polling' | 'webhook' | 'off' = !env.TELEGRAM_BOT_TOKEN
   ? 'off'
-  : (env.BOT_MODE ?? 'polling');
+  : (env.BOT_MODE ?? (isServerless ? 'webhook' : 'polling'));
+
+/**
+ * Which invoice storage backend is live. Resolved once here so `storage.ts` picks its backend at
+ * module load and never re-decides per call. See STORAGE_DRIVER above for the defaulting rule.
+ */
+export const storageDriver: 'disk' | 'supabase' =
+  env.STORAGE_DRIVER ?? (env.SUPABASE_URL ? 'supabase' : 'disk');
 
 export const isProduction = env.NODE_ENV === 'production';
 export const isDevelopment = env.NODE_ENV === 'development';

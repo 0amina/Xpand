@@ -1,6 +1,7 @@
 import { Prisma, type invoice_status } from '@prisma/client';
 
 import { INVOICE_DEFAULT_CATEGORY, type InvoiceMimeType } from '../../config/constants.js';
+import { env } from '../../config/env.js';
 import { logger } from '../../config/logger.js';
 import { prisma } from '../../db/prisma.js';
 import type { AuthenticatedUser } from '../../types/index.js';
@@ -122,12 +123,19 @@ async function findDefaultCategoryId(): Promise<number | null> {
 // ---------------------------------------------------------------------------------------------
 
 /**
- * Store an upload and queue it for OCR.
+ * Store an upload and run it through OCR.
  *
- * Returns as soon as the bytes are safely on disk and the row exists, with status PENDING. OCR
- * takes a few seconds per page and is **not** awaited here — holding the HTTP request open for it
- * would risk a proxy timeout and would make the upload feel broken on a slow phone connection.
- * The client polls `GET /api/invoices/:id` and watches `status` instead.
+ * Two shapes, chosen by `OCR_SYNC`:
+ *
+ *  - **off (a long-lived server)** — returns as soon as the bytes are stored and the row exists,
+ *    with status PENDING, and OCR continues in the background. Holding the HTTP request open for
+ *    the few seconds a page takes would risk a proxy timeout and make the upload feel broken on a
+ *    slow phone connection. The client polls `GET /api/invoices/:id` and watches `status`.
+ *  - **on (serverless)** — awaits the pipeline, so the row is already READY or FAILED when the
+ *    response goes out. Not a preference but a requirement: the instance is frozen the moment a
+ *    response is written, so a fire-and-forget pipeline is killed partway through and the invoice
+ *    never leaves PENDING. The client's polling loop still works — it just finds the answer on
+ *    its first poll.
  */
 export async function createInvoice(
   file: { bytes: Buffer; mimeType: InvoiceMimeType; originalName?: string | undefined },
@@ -154,7 +162,14 @@ export async function createInvoice(
     throw err;
   }
 
-  // Fire and forget, with the error captured on the row rather than thrown into the void.
+  // Either way the error is captured on the row rather than thrown — `runOcrPipeline` never
+  // rejects, so awaiting it cannot turn a readable OCR failure into a failed upload.
+  if (env.OCR_SYNC) {
+    await runOcrPipeline(invoice.id, file.bytes);
+    // Re-read: the pipeline moved the row to READY or FAILED and wrote the extraction.
+    return getInvoiceOr404(invoice.id);
+  }
+
   void runOcrPipeline(invoice.id, file.bytes);
 
   return invoice;

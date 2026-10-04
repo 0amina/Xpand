@@ -19,10 +19,12 @@ import {
   listInvoices,
   retryOcr,
 } from './service.js';
-import { assertAcceptableUpload, invoiceFileExists, readInvoiceFile } from './storage.js';
-import { readFile } from 'node:fs/promises';
-import path from 'node:path';
-import { env } from '../../config/env.js';
+import {
+  assertAcceptableUpload,
+  invoiceFileExists,
+  readInvoiceBytes,
+  readInvoiceFile,
+} from './storage.js';
 
 /**
  * Map an invoice row to the API DTO.
@@ -144,7 +146,8 @@ export async function retry(req: Request, res: Response): Promise<void> {
     );
   }
 
-  const bytes = await readFile(path.join(path.resolve(env.UPLOAD_DIR), invoice.image_url));
+  // Through the storage layer, not `fs` — the bytes may be in an object store, not on this disk.
+  const bytes = await readInvoiceBytes(invoice.image_url);
   const updated = await retryOcr(id, bytes);
   const draft = await getInvoiceDraft(updated);
 

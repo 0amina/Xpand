@@ -81,14 +81,17 @@ type mappings and caveats.
 
 ## Scripts
 
-| Script              | What it does                                          |
-| ------------------- | ----------------------------------------------------- |
-| `npm run dev`       | Start the server with `tsx watch` (hot reload).       |
-| `npm run build`     | Type-check and compile TypeScript to `dist/`.         |
-| `npm start`         | Run the compiled server from `dist/` (after `build`). |
-| `npm run typecheck` | Type-check only, no emit (`tsc --noEmit`).            |
-| `npm run lint`      | Lint all `.ts` files with ESLint.                     |
-| `npm run format`    | Format the codebase with Prettier.                    |
+| Script                  | What it does                                                   |
+| ----------------------- | -------------------------------------------------------------- |
+| `npm run dev`           | Start the server with `tsx watch` (hot reload).                |
+| `npm run build`         | Type-check and compile TypeScript to `dist/`.                  |
+| `npm start`             | Run the compiled server from `dist/` (after `build`).          |
+| `npm run typecheck`     | Type-check only, no emit (`tsc --noEmit`).                     |
+| `npm run lint`          | Lint all `.ts` files with ESLint.                              |
+| `npm run format`        | Format the codebase with Prettier.                             |
+| `npm test`              | Run the Node test runner (`scripts/test.mjs`).                 |
+| `npm run bot:register`  | Point Telegram at `BOT_WEBHOOK_URL`. One-off, per deployment.  |
+| `npm run files:migrate` | Copy invoice files from `UPLOAD_DIR` into the Supabase bucket. |
 
 ## Project structure
 
@@ -129,24 +132,38 @@ Each built module holds `routes.ts`, `controller.ts` (HTTP + DTO mapping), `serv
 Validated at startup by [src/config/env.ts](src/config/env.ts). If any required variable is
 missing or malformed, the server prints a clear error and exits before listening.
 
-| Variable             | Required | Default       | Description                                                       |
-| -------------------- | -------- | ------------- | ----------------------------------------------------------------- |
-| `DATABASE_URL`       | yes      | —             | PostgreSQL connection string used by Prisma.                      |
-| `PORT`               | no       | `3000`        | HTTP port to listen on.                                           |
-| `NODE_ENV`           | no       | `development` | `development` \| `test` \| `production` (controls log format).    |
-| `CORS_ORIGINS`       | no       | _(empty)_     | Comma-separated allowed origins. Empty = no cross-origin browser. |
-| `LOG_LEVEL`          | no       | `info`        | `fatal`\|`error`\|`warn`\|`info`\|`debug`\|`trace`\|`silent`.     |
-| `TELEGRAM_BOT_TOKEN` | **in prod** | —          | Bot token from @BotFather. Verifies initData **and** runs the bot. |
-| `BOT_MODE`           | no       | `polling`\*   | `polling` \| `webhook` \| `off`. \*`off` when no token is set.     |
-| `BOT_WEBHOOK_URL`    | webhook  | —             | Public HTTPS base URL of this backend.                            |
-| `BOT_WEBHOOK_SECRET` | no       | _derived_     | Secret token Telegram echoes back; derived from the bot token.    |
-| `MINI_APP_URL`       | no       | —             | HTTPS URL of the Mini App, for the bot's "Open app" buttons.      |
-| `OPENING_BALANCE`    | no       | `0`           | Starting cash balance for the cash-position report.               |
-| `UPLOAD_DIR`         | no       | `./uploads/invoices` | Where invoice files are written. Gitignored.                |
-| `MAX_UPLOAD_MB`      | no       | `10`          | Ceiling on a single invoice upload.                               |
-| `OCR_LANGS`          | no       | `fra+eng`     | Tesseract languages, `+`-joined.                                  |
-| `TESSDATA_DIR`       | no       | `./.tessdata` | OCR language-data cache. First run needs network to fill it.       |
-| `OCR_ENABLED`        | no       | `true`        | `false` still accepts uploads; drafts are then filled by hand.     |
+| Variable                    | Required    | Default              | Description                                                        |
+| --------------------------- | ----------- | -------------------- | ------------------------------------------------------------------ |
+| `DATABASE_URL`              | yes         | —                    | PostgreSQL connection string used by Prisma.                       |
+| `PORT`                      | no          | `3000`               | HTTP port to listen on.                                            |
+| `NODE_ENV`                  | no          | `development`        | `development` \| `test` \| `production` (controls log format).     |
+| `CORS_ORIGINS`              | no          | _(empty)_            | Comma-separated allowed origins. Empty = no cross-origin browser.  |
+| `LOG_LEVEL`                 | no          | `info`               | `fatal`\|`error`\|`warn`\|`info`\|`debug`\|`trace`\|`silent`.      |
+| `TELEGRAM_BOT_TOKEN`        | **in prod** | —                    | Bot token from @BotFather. Verifies initData **and** runs the bot. |
+| `BOT_MODE`                  | no          | `polling`\*          | `polling` \| `webhook` \| `off`. \*`off` when no token is set.     |
+| `BOT_WEBHOOK_URL`           | webhook     | —                    | Public HTTPS base URL of this backend.                             |
+| `BOT_WEBHOOK_SECRET`        | no          | _derived_            | Secret token Telegram echoes back; derived from the bot token.     |
+| `MINI_APP_URL`              | no          | —                    | HTTPS URL of the Mini App, for the bot's "Open app" buttons.       |
+| `OPENING_BALANCE`           | no          | `0`                  | Starting cash balance for the cash-position report.                |
+| `MAX_UPLOAD_MB`             | no          | `10`                 | Ceiling on one invoice upload. Max 50.                             |
+| `OCR_LANGS`                 | no          | `fra+eng`            | Tesseract languages, `+`-joined.                                   |
+| `OCR_ENABLED`               | no          | `true`               | `false` accepts uploads but skips OCR; drafts are filled by hand.  |
+| `OCR_SYNC`                  | no          | _serverless_         | Run OCR inside the upload request. On by default on Vercel.        |
+| `UPLOAD_DIR`                | no          | `./uploads/invoices` | Where the `disk` driver writes files.                              |
+| `TESSDATA_DIR`              | no          | `./.tessdata`        | Tesseract language-data cache. Under `/tmp` on Vercel.             |
+| `STORAGE_DRIVER`            | no          | _derived_            | `disk` \| `supabase`. `supabase` when `SUPABASE_URL` is set.       |
+| `SUPABASE_URL`              | supabase    | —                    | Supabase project URL.                                              |
+| `SUPABASE_SERVICE_ROLE_KEY` | supabase    | —                    | Server-only key; bypasses RLS. Never expose to the browser.        |
+| `SUPABASE_STORAGE_BUCKET`   | no          | `invoices`           | Bucket for invoice files. Create it **private**.                   |
+
+`BOT_MODE` defaults to `webhook` on Vercel and `polling` elsewhere. `OCR_SYNC` and the writable
+paths (`UPLOAD_DIR`, `TESSDATA_DIR`) also change default on a serverless host — see
+[Deployment](#deployment-vercel--supabase-free-tier) for why each one has to.
+| `UPLOAD_DIR` | no | `./uploads/invoices` | Where invoice files are written. Gitignored. |
+| `MAX_UPLOAD_MB` | no | `10` | Ceiling on a single invoice upload. |
+| `OCR_LANGS` | no | `fra+eng` | Tesseract languages, `+`-joined. |
+| `TESSDATA_DIR` | no | `./.tessdata` | OCR language-data cache. First run needs network to fill it. |
+| `OCR_ENABLED` | no | `true` | `false` still accepts uploads; drafts are then filled by hand. |
 
 An **empty** value is treated as unset, so `TELEGRAM_BOT_TOKEN=` in a `.env` file means "no
 token" rather than "a token that is the empty string".
@@ -167,13 +184,13 @@ so a valid signature **proves** the caller is that Telegram user.
 
 [src/utils/telegramAuth.ts](src/utils/telegramAuth.ts) implements Telegram's algorithm:
 
-1. Every `key=value` pair except `hash`, sorted by key, joined with `\n` — the *data check string*.
+1. Every `key=value` pair except `hash`, sorted by key, joined with `\n` — the _data check string_.
 2. `secret_key = HMAC_SHA256(key: "WebAppData", message: <bot token>)`
 3. `expected = HMAC_SHA256(key: secret_key, message: <data check string>)`
 4. Constant-time compare against the `hash` field.
 
-Note step 2's unusual order — the literal `"WebAppData"` is the HMAC *key* and the token is the
-*message*. Swapping them yields a validator that rejects everything.
+Note step 2's unusual order — the literal `"WebAppData"` is the HMAC _key_ and the token is the
+_message_. Swapping them yields a validator that rejects everything.
 
 Signatures older than **24 hours** are rejected (`auth_date`), bounding replay of a leaked
 string. On this path the user row is **created on first contact** from the verified profile, so
@@ -194,7 +211,7 @@ The books belong to the company, not to each employee, and access is controlled 
 the bot rather than by what the app grants them once they are in.
 
 No endpoint returns **403**, there is no `requireRole`, and `transactions.user_id` records
-*who logged the entry* -- authorship for the audit trail, never a permission.
+_who logged the entry_ -- authorship for the audit trail, never a permission.
 
 The `users.role` column still exists and is always `ADMIN`, its only remaining enum value.
 Nothing reads or writes it; it is kept so roles could return without a data migration.
@@ -209,15 +226,15 @@ either unusable or wide open.
 
 Commands are shortcuts; the Mini App stays the interface for complex work.
 
-| Command | Behaviour |
-| --- | --- |
-| `/start` | Greets, creates the user, shows the app buttons. |
-| `/help` | Full command reference. |
-| `/balance` | Cash position, opening balance, all-time in/out/net. |
-| `/today` | Today's income, expenses, net, entry count. |
-| `/transactions` | Last 10 entries + a button into the app. |
-| `/income [amount] [category] [note]` | Logs income; bare form opens the app. |
-| `/expense [amount] [category] [note]` | Logs an expense; bare form opens the app. |
+| Command                               | Behaviour                                            |
+| ------------------------------------- | ---------------------------------------------------- |
+| `/start`                              | Greets, creates the user, shows the app buttons.     |
+| `/help`                               | Full command reference.                              |
+| `/balance`                            | Cash position, opening balance, all-time in/out/net. |
+| `/today`                              | Today's income, expenses, net, entry count.          |
+| `/transactions`                       | Last 10 entries + a button into the app.             |
+| `/income [amount] [category] [note]`  | Logs income; bare form opens the app.                |
+| `/expense [amount] [category] [note]` | Logs an expense; bare form opens the app.            |
 
 ```
 /expense 250 transport taxi to airport    → logged, with an Undo button
@@ -243,7 +260,7 @@ trade-off, and the timezone caveat.
 ### Testing the bot locally
 
 Polling needs no public URL, so the bot works on a laptop as soon as the token is set. The Mini
-App *buttons* do need HTTPS — Telegram rejects `http://localhost`:
+App _buttons_ do need HTTPS — Telegram rejects `http://localhost`:
 
 ```bash
 # terminal 1 — frontend
@@ -268,12 +285,12 @@ or `x-telegram-id` in development (see [Authentication](#authentication)).
 
 ### Users
 
-| Method & path           | Access | Notes                                                |
-| ----------------------- | ------ | ---------------------------------------------------- |
-| `POST /api/users/login` | public | Upsert on Telegram login. Profile fields only.       |
-| `GET  /api/users/me`    | auth   | The current user.                                    |
-| `GET  /api/users`       | auth   | List all users.                                      |
-| `GET  /api/users/:id`   | auth   | One user by Telegram id.                             |
+| Method & path           | Access | Notes                                          |
+| ----------------------- | ------ | ---------------------------------------------- |
+| `POST /api/users/login` | public | Upsert on Telegram login. Profile fields only. |
+| `GET  /api/users/me`    | auth   | The current user.                              |
+| `GET  /api/users`       | auth   | List all users.                                |
+| `GET  /api/users/:id`   | auth   | One user by Telegram id.                       |
 
 ### Categories
 
@@ -287,13 +304,13 @@ or `x-telegram-id` in development (see [Authentication](#authentication)).
 
 ### Transactions
 
-| Method & path                  | Access | Notes                                                      |
-| ------------------------------ | ------ | ---------------------------------------------------------- |
-| `GET    /api/transactions`     | auth   | Every user's rows, narrowed by the optional filters.       |
-| `GET    /api/transactions/:id` | auth   | Any transaction. **404** only when it does not exist.      |
-| `POST   /api/transactions`     | auth   | Attributed to the caller. Category/type rule enforced.     |
-| `PATCH  /api/transactions/:id` | auth   | Any transaction; re-checks compatibility on change.        |
-| `DELETE /api/transactions/:id` | auth   | Any transaction.                                           |
+| Method & path                  | Access | Notes                                                  |
+| ------------------------------ | ------ | ------------------------------------------------------ |
+| `GET    /api/transactions`     | auth   | Every user's rows, narrowed by the optional filters.   |
+| `GET    /api/transactions/:id` | auth   | Any transaction. **404** only when it does not exist.  |
+| `POST   /api/transactions`     | auth   | Attributed to the caller. Category/type rule enforced. |
+| `PATCH  /api/transactions/:id` | auth   | Any transaction; re-checks compatibility on change.    |
+| `DELETE /api/transactions/:id` | auth   | Any transaction.                                       |
 
 **List filters:** `from`, `to` (inclusive `transaction_date` range, `from ≤ to`),
 `categoryId`, `type`, and `userId` to narrow to one person's entries.
@@ -387,15 +404,15 @@ heuristics and their locale assumptions, in [src/modules/invoices/README.md](src
 
 | Method & path                        | Access | Notes                                                              |
 | ------------------------------------ | ------ | ------------------------------------------------------------------ |
-| `POST   /api/invoices`               | auth   | `multipart/form-data`, field `file`. 201, status `PENDING`.         |
-| `GET    /api/invoices`               | auth   | `?status=` / `?transactionId=`. `meta.awaitingReview` for badging.  |
-| `GET    /api/invoices/:id`           | auth   | Invoice + `draft`. Poll while `PENDING`/`PROCESSING`.               |
+| `POST   /api/invoices`               | auth   | `multipart/form-data`, field `file`. 201, status `PENDING`.        |
+| `GET    /api/invoices`               | auth   | `?status=` / `?transactionId=`. `meta.awaitingReview` for badging. |
+| `GET    /api/invoices/:id`           | auth   | Invoice + `draft`. Poll while `PENDING`/`PROCESSING`.              |
 | `GET    /api/invoices/:id/file`      | auth   | The stored image. Never served statically.                         |
 | `GET    /api/invoices/:id/raw-text`  | auth   | What the OCR engine read, verbatim.                                |
 | `POST   /api/invoices/:id/retry-ocr` | auth   | Read the page again.                                               |
-| `POST   /api/invoices/:id/confirm`   | auth   | **Creates the transaction** from the user's verified values.         |
-| `POST   /api/invoices/:id/link`      | auth   | Attach to an existing transaction. Creates nothing.                 |
-| `DELETE /api/invoices/:id`           | auth   | Discards an unconfirmed invoice. 409 once confirmed.                |
+| `POST   /api/invoices/:id/confirm`   | auth   | **Creates the transaction** from the user's verified values.       |
+| `POST   /api/invoices/:id/link`      | auth   | Attach to an existing transaction. Creates nothing.                |
+| `DELETE /api/invoices/:id`           | auth   | Discards an unconfirmed invoice. 409 once confirmed.               |
 
 **The rule that matters:** an unverified draft is never a transaction. OCR output lives in
 `invoices.ocr_extracted_data`; `transactions` gains a row only on confirm, from values the user
@@ -485,6 +502,125 @@ switch. `schema.prisma` was re-pulled so `@default("TND")` reflects it. The app 
 - **Reports — dates are UTC.** Day/month boundaries are computed in UTC to match the `DATE`
   column, which Prisma reads at UTC midnight.
 
+## Deployment (Vercel + Supabase, free tier)
+
+The backend runs as a single Vercel serverless function: `api/index.js` builds the same
+`createApp()` the local server does, and `vercel.json` rewrites every path to it. Routing,
+middleware order and error handling are therefore identical on both hosts — only the transport
+differs.
+
+### What serverless changes, and why
+
+Four things do not survive a read-only, frozen-between-requests runtime. Each is handled rather
+than worked around:
+
+| Local behaviour                               | On Vercel                                                                                                                                                                                                                                                                             | Where                             |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- |
+| `app.listen()` + graceful shutdown on SIGTERM | The platform owns the socket; instances are frozen, never signalled. `api/index.js` exports a handler and skips the lifecycle entirely.                                                                                                                                               | `api/index.js`                    |
+| Bot **polls** Telegram                        | Polling needs a process that outlives a request. Mode defaults to `webhook`, and the route initialises the bot on demand — nothing runs `startBot()` there. Registration is a one-off (`npm run bot:register`), because a cold start per traffic burst would re-register on each one. | `src/modules/bot/index.ts`        |
+| Invoice files written to `UPLOAD_DIR`         | The filesystem is read-only apart from `/tmp`, and `/tmp` is gone before the user opens the review screen. Files go to a **private** Supabase Storage bucket instead.                                                                                                                 | `src/modules/invoices/storage.ts` |
+| OCR runs **after** the response               | The instance is frozen the moment a response is written, so a background pipeline is killed partway and the invoice never leaves `PENDING`. `OCR_SYNC` awaits it, so the response already carries the draft.                                                                          | `src/modules/invoices/service.ts` |
+
+The server refuses to boot on a serverless host without Supabase credentials, rather than
+accepting uploads it cannot keep.
+
+### Database
+
+Use the Supabase **transaction pooler** string (port `6543`) as `DATABASE_URL`, with
+`?pgbouncer=true&connection_limit=1`. Every serverless instance opens its own pool, so direct
+connections on port `5432` exhaust a free project within minutes of real traffic. The two query
+parameters are not optional: `pgbouncer=true` stops Prisma using prepared statements, which a
+transaction-mode pooler cannot hold across statements.
+
+`prisma/schema.prisma` stays **introspected** — do not run `migrate` or `db push`. Move the
+schema with `pg_dump` instead, which is the only way the two `CHECK` constraints survive
+(`transactions_amount_check`, `product_packaging_quantity_check`); Prisma cannot express them, so
+anything generated from the datamodel would silently drop them and let a negative amount in.
+
+```bash
+# 1. Schema and data out of the local database.
+pg_dump -U postgres -h localhost -d xpand --schema-only --schema=public \
+  --no-owner --no-privileges --no-publications --no-subscriptions -f 01-schema.sql
+pg_dump -U postgres -h localhost -d xpand --data-only --schema=public \
+  --no-owner --no-privileges -f 02-data.sql
+
+# 2. Three statements must be stripped before a managed host will accept it:
+#      CREATE SCHEMA public       - already exists, aborts the script
+#      COMMENT ON SCHEMA public   - not ours to comment on
+#      SET transaction_timeout    - PostgreSQL 17 only; a PG15 instance rejects it
+#    Do NOT pass --disable-triggers to the data dump: it emits ALTER TABLE ... DISABLE TRIGGER
+#    ALL, which needs true superuser rights no managed host grants. The COPY blocks come out in
+#    parent-before-child order, so the foreign keys hold without it.
+
+# 3. In, over the DIRECT connection (port 5432) — poolers and DDL do not mix.
+psql "$DIRECT_URL" -v ON_ERROR_STOP=1 -f 01-schema.sql -f 02-data.sql
+```
+
+Never pipe `psql` into `head`: the pipe closing early sends SIGPIPE, `psql` dies partway, and
+because the trailing `setval` calls are the last thing in a dump the sequences are left unset.
+Everything looks fine until the first insert collides with an existing id.
+
+Verify the sequences landed — this is the failure that hides:
+
+```bash
+psql "$DIRECT_URL" -At -c \
+  "SELECT sequencename, last_value FROM pg_sequences WHERE schemaname='public' ORDER BY 1;"
+```
+
+### Invoice files
+
+Create the bucket as **private** (Storage → New bucket, "Public" unchecked). Files are served
+only through `GET /api/invoices/:id/file` so `requireAuth` sits in front of them; a public bucket
+would put every receipt the company has behind a guessable URL. Then move the existing files:
+
+```bash
+npm run files:migrate -- --dry-run   # what would be uploaded
+npm run files:migrate                # upload it
+```
+
+It is driven by the `invoices` rows rather than a directory listing, so it uploads exactly what
+the app can reach and reports rows whose bytes are already gone.
+
+### Order of operations
+
+The two deployments each need the other's URL, so one pass cannot settle both:
+
+1. Deploy the frontend → note its URL.
+2. Deploy the backend with `CORS_ORIGINS` and `MINI_APP_URL` set to that URL.
+3. Rebuild the frontend with `VITE_API_BASE_URL` set to the backend URL. Vite inlines env vars at
+   **build** time, so setting the variable is not enough — it needs a fresh deployment.
+4. `npm run bot:register` with `BOT_WEBHOOK_URL` set to the backend URL.
+5. @BotFather → `/myapps` → Edit Web App URL → the frontend URL.
+
+### Caveats worth knowing
+
+- **A free Supabase project pauses after 7 days with no activity.** The first request after that
+  fails until it is restored from the dashboard. Real daily use never hits this.
+- **Vercel's Hobby plan is for non-commercial use.** This is an internal company tool, which is
+  not obviously within that. Worth reading the current terms before it matters.
+- **Cold-start OCR re-downloads language data.** `TESSDATA_DIR` lives under `/tmp`, which does not
+  survive, so each cold start fetches ~6 MB of `*.traineddata` again. Committing the files and
+  copying them into `/tmp` at startup would remove the round trip if it proves slow.
+
+### `includeFiles` is load-bearing for OCR
+
+Vercel bundles a function by statically tracing its imports, and tesseract.js defeats that twice:
+
+- `src/worker/node/defaultOptions.js` builds its worker path with `path.join(__dirname, …)` and
+  hands it to `new Worker()`. A computed path is invisible to the tracer, so neither the worker
+  script **nor anything it requires** is traced.
+- the Emscripten cores `readFileSync` their `.wasm` sibling by name at runtime.
+
+Both are listed explicitly in `vercel.json` instead. Without them the deploy succeeds, the API
+works, and OCR fails at the first upload with a module-not-found error from inside a worker
+thread — which is a long way from the cause.
+
+Only the `*lstm*` cores are included, not all eight variants: `ocr.ts` calls `createWorker` with
+`oem = 1` (`LSTM_ONLY`), and `worker-script/node/getCore.js` can only reach an `-lstm` build on
+that branch. That is 20 MB rather than 44 MB, which matters because Prisma's query engine already
+spends a large share of the 250 MB unzipped function budget. If the OEM ever changes, widen the
+glob to `node_modules/tesseract.js-core/**`.
+
 ## What's next
 
 1. **PDF invoices.** Uploads accept images only, because Tesseract is an image OCR engine; a
@@ -497,5 +633,3 @@ switch. `schema.prisma` was re-pulled so `@default("TND")` reflects it. The app 
 3. **Per-user timezone.** Report boundaries and bot entries use UTC; the Mini App pins the
    client's local day. Near midnight in UTC+1 the two can disagree by a day. A `timezone`
    column on `users` would settle it for both surfaces.
-4. **Deployment** — switch `BOT_MODE` to `webhook`, set `BOT_WEBHOOK_URL`, and put the real
-   frontend origin in `CORS_ORIGINS`.

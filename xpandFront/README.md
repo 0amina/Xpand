@@ -55,6 +55,25 @@ bundle** — never put a secret in it.
 | `VITE_DEV_TELEGRAM_ID` | — | Dev only. Skips the sign-in screen and boots as this Telegram id. Ignored inside Telegram. |
 | `VITE_DEV_FIRST_NAME` | `Dev` | Name used if `VITE_DEV_TELEGRAM_ID` is new to the backend. |
 
+Vite **inlines these at build time**, so changing one on the host does nothing until the app is
+rebuilt. On Vercel that means a redeploy, not just an edit in the dashboard — the single most
+common way a deployed Mini App ends up still calling `localhost:3000`.
+
+## Deployment (Vercel)
+
+A static SPA, so there is almost nothing to configure: Root Directory `xpandFront`, and Vercel's
+Vite preset handles the rest. [vercel.json](vercel.json) adds two things the preset does not:
+
+- a catch-all rewrite to `index.html`, so a deep link like `/history` is served by the app rather
+  than 404-ing. Rewrites are evaluated **after** the filesystem, so real asset requests still win.
+- a year-long `immutable` cache on `/assets/*`, which is safe because Vite content-hashes those
+  filenames and unsafe for anything else.
+
+Set `VITE_API_BASE_URL` to the backend's URL **before** the deploy you intend to keep, for the
+reason above. The backend in turn needs this app's origin in its `CORS_ORIGINS` and `MINI_APP_URL`,
+and @BotFather needs it as the Web App URL — see the backend README's Deployment section for the
+order the two have to be brought up in.
+
 ## Authentication
 
 Two paths, matching the backend's two accepted credentials. Both live in

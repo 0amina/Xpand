@@ -14,7 +14,9 @@
     "lint": "eslint . --ext .ts",
     "format": "prettier --write .",
     "typecheck": "tsc --noEmit",
-    "test": "node scripts/test.mjs"
+    "test": "node scripts/test.mjs",
+    "bot:register": "npm run build && node scripts/register-webhook.mjs",
+    "files:migrate": "node scripts/migrate-invoice-files.mjs"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",

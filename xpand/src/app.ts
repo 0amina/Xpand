@@ -63,15 +63,29 @@ export function createApp(): Application {
    * secret token grammy verifies on every call.
    *
    * The handler is resolved per-request rather than at mount time because the bot is started
-   * after the app is built — this way neither has to wait for the other.
+   * after the app is built — this way neither has to wait for the other. Resolving it is async
+   * so that on a serverless host, where nothing ran `startBot()`, the first update can initialise
+   * the bot itself instead of finding no handler and 404-ing every command.
+   *
+   * A failure to resolve is a 500 rather than a crash: Telegram retries a 5xx, so a cold start
+   * that could not reach `getMe` loses nothing.
    */
   app.post(WEBHOOK_PATH, (req, res, next) => {
-    const handler = botWebhookHandler();
-    if (!handler) {
-      res.status(404).json({ error: { message: 'Webhook mode is not enabled', statusCode: 404 } });
-      return;
-    }
-    void handler(req, res, next);
+    void (async () => {
+      let handler;
+      try {
+        handler = await botWebhookHandler();
+      } catch (err) {
+        next(err);
+        return;
+      }
+
+      if (!handler) {
+        res.status(404).json({ error: { message: 'Webhook mode is not enabled', statusCode: 404 } });
+        return;
+      }
+      await handler(req, res, next);
+    })();
   });
 
   app.use(rateLimiter);
