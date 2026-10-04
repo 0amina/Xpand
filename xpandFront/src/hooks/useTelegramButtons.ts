@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 
-import { webApp } from '@/lib/telegram';
+import { isTelegram, webApp } from '@/lib/telegram';
 
 /**
  * Bind Telegram's native BackButton to a handler while a screen is mounted.
@@ -46,8 +46,13 @@ interface MainButtonOptions {
  * Drive Telegram's native MainButton — the full-width bar pinned above the keyboard.
  *
  * It is the fastest possible submit target on a phone (always in the same place, always under
- * the thumb, unaffected by scroll position). The forms still render their own submit button so
- * the app works identically in a browser; the two are kept in sync from the same state.
+ * the thumb, unaffected by scroll position).
+ *
+ * **Returns whether the native button is the one on screen**, which callers must use to decide
+ * whether to render their own. A form that renders both unconditionally shows the user two Save
+ * buttons inside Telegram — the native bar at the bottom of the client and the in-page bar sitting
+ * above the tab bar — and the pair is worse than either alone: it is not obvious they do the same
+ * thing, and the in-page one is the one that looks half-hidden behind the menu.
  */
 export function useTelegramMainButton({
   text,
@@ -57,7 +62,7 @@ export function useTelegramMainButton({
   loading = false,
   color,
   textColor,
-}: MainButtonOptions): void {
+}: MainButtonOptions): boolean {
   const handler = useRef(onClick);
   handler.current = onClick;
 
@@ -89,4 +94,9 @@ export function useTelegramMainButton({
     if (loading) button.showProgress(false);
     else button.hideProgress();
   }, [text, visible, enabled, loading, color, textColor]);
+
+  // `isTelegram` as well as the object's presence: the SDK script is loaded in a plain browser
+  // tab too, where `MainButton` exists but paints nothing, so testing for the object alone would
+  // leave a browser user with no submit button at all.
+  return isTelegram && Boolean(webApp?.MainButton) && visible;
 }

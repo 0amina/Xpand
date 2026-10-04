@@ -205,7 +205,9 @@ export function TransactionFormPage({ mode }: { mode: 'create' | 'edit' }) {
 
   const tone = type === 'INCOME' ? 'income' : 'expense';
 
-  useTelegramMainButton({
+  // True inside Telegram, where the client paints the submit bar itself. The in-page bar below
+  // is then *not* rendered — see the note where it is.
+  const nativeSaveButton = useTelegramMainButton({
     text: mode === 'edit' ? 'Save changes' : `Save ${type === 'INCOME' ? 'income' : 'expense'}`,
     onClick: () => void submit(),
     enabled: isValid,
@@ -226,7 +228,7 @@ export function TransactionFormPage({ mode }: { mode: 'create' | 'edit' }) {
     <>
       {mode === 'edit' && <ScreenHeader title="Edit transaction" />}
 
-      <div className="entry-form">
+      <div className={`entry-form ${nativeSaveButton ? '' : 'entry-form--with-submit-bar'}`}>
         {mode === 'create' ? (
           <h1 className="page__title">{type === 'INCOME' ? 'Add income' : 'Add expense'}</h1>
         ) : (
@@ -324,23 +326,31 @@ export function TransactionFormPage({ mode }: { mode: 'create' | 'edit' }) {
       </div>
 
       {/*
-        Mirrors Telegram's native MainButton so the app is equally usable in a browser tab.
-        Both call the same `submit`, so their enabled/loading states can never diverge.
+        Stands in for Telegram's native MainButton where there isn't one — a browser tab, or a
+        client too old to have it. Inside Telegram it is deliberately absent: rendering both put
+        two Save buttons on the same screen, the native bar at the bottom of the client and this
+        one just above the tab bar, which read as two different actions and made the in-page one
+        look like it was hidden behind the menu. Same `submit` either way, so the enabled and
+        loading states cannot diverge between the two.
       */}
-      <div className="entry-form__submit-bar">
-        <Button
-          variant={tone}
-          size="lg"
-          block
-          loading={mutation.isPending}
-          disabled={!isValid}
-          onClick={() => void submit()}
+      {!nativeSaveButton && (
+        <div
+          className={`entry-form__submit-bar ${mode === 'edit' ? 'entry-form__submit-bar--no-tabbar' : ''}`}
         >
-          {mode === 'edit'
-            ? 'Save changes'
-            : `Save ${type === 'INCOME' ? 'income' : 'expense'}${amountValue > 0 ? ` · ${formatMoney(amountValue)}` : ''}`}
-        </Button>
-      </div>
+          <Button
+            variant={tone}
+            size="lg"
+            block
+            loading={mutation.isPending}
+            disabled={!isValid}
+            onClick={() => void submit()}
+          >
+            {mode === 'edit'
+              ? 'Save changes'
+              : `Save ${type === 'INCOME' ? 'income' : 'expense'}${amountValue > 0 ? ` · ${formatMoney(amountValue)}` : ''}`}
+          </Button>
+        </div>
+      )}
     </>
   );
 }

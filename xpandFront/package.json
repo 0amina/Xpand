@@ -13,7 +13,7 @@
     "preview": "vite preview",
     "typecheck": "tsc -b",
     "lint": "eslint .",
-    "smoke": "node scripts/smoke-invoices.mjs",
+    "smoke": "node scripts/smoke-invoices.mjs && node scripts/smoke-entry.mjs",
     "format": "prettier --write ."
   },
   "dependencies": {

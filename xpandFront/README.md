@@ -43,6 +43,7 @@ change is needed for local work.
 | `npm run typecheck` | Types only, no emit.                          |
 | `npm run lint`      | ESLint over the whole project.                |
 | `npm run format`    | Prettier.                                     |
+| `npm run smoke`     | jsdom against the built bundle — see below.   |
 
 ### Environment variables
 
@@ -141,8 +142,9 @@ each get their own tab**. Logging anything is one tap from anywhere.
   is twenty entries in a row, and a detour to a detail screen after each would double the taps.
 - **Optional fields are folded away** behind "More details", with a badge so a collapsed
   section never hides a value that is already set.
-- **Telegram's native MainButton** is bound to submit, mirrored by an in-page button so the app
-  behaves identically in a browser.
+- **Telegram's native MainButton** is bound to submit, and the in-page save bar renders **only
+  when there is no native one** — a browser tab, or a client too old to have it. Rendering both
+  put two Save buttons on the same screen, which read as two different actions.
 
 ## Two backend details worth knowing
 
@@ -222,13 +224,23 @@ queue is empty that module can be deleted.
 
 ## Smoke test
 
-`npm run smoke` loads the **built** bundle in jsdom against a live backend on `localhost:3000` and
-walks the invoice screens. Chrome and Edge will not launch in this environment, so this is the
-closest available thing to driving the real app: it executes the production bundle, which catches
-what `tsc` cannot — a bad import, a hook that throws on first render, a crash reading a field that
-is null in practice.
+`npm run smoke` loads the **built** bundle in jsdom against a live backend on `localhost:3000`.
+Chrome and Edge will not launch in this environment, so this is the closest available thing to
+driving the real app: it executes the production bundle, which catches what `tsc` cannot — a bad
+import, a hook that throws on first render, a crash reading a field that is null in practice.
 
-Run `npm run build` first; it reads from `dist/`.
+Two scripts, runnable on their own:
+
+| Script                       | What it drives                                                                                                                                         |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `scripts/smoke-invoices.mjs` | The invoice screens, including the in-app camera: the stream opens, the shutter grabs a frame, accepting it hands a JPEG to the uploader.              |
+| `scripts/smoke-entry.mjs`    | `/add/expense` in both hosts — a browser tab, where the page must render the only Save button, and a faked Telegram client, where it must render none. |
+
+Each fakes only the browser: no `mediaDevices` and no canvas exist in jsdom, and a valid Telegram
+`initData` signature cannot be minted outside Telegram, so that credential is swapped for the dev
+header. The backend is real, and so is everything above those seams.
+
+Run `npm run build` first; both read from `dist/`.
 
 ## Testing inside Telegram
 

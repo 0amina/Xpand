@@ -355,7 +355,13 @@
   flex-direction: column;
   gap: var(--x-space-4);
   padding: var(--x-space-4);
-  /* Room for the sticky save bar plus the tab bar underneath it. */
+  /* Clears the tab bar. Inside Telegram the save bar below is not rendered at all — the client
+     draws its own — so this is all the room the last field needs. */
+  padding-bottom: calc(var(--x-tabbar-height) + var(--x-safe-bottom) + var(--x-space-4));
+}
+
+/* Extra room for the in-page save bar, which only exists outside Telegram. */
+.entry-form--with-submit-bar {
   padding-bottom: calc(var(--x-tabbar-height) + var(--x-safe-bottom) + 96px);
 }
 
@@ -368,6 +374,13 @@
   padding: var(--x-space-3) var(--x-space-4);
   background: var(--x-surface);
   border-top: 1px solid var(--x-border);
+}
+
+/* Edit is a full-screen route with no tab bar under it, so the bar sits on the bottom edge
+   instead of floating a tab bar's height above it with a strip of page showing through. */
+.entry-form__submit-bar--no-tabbar {
+  bottom: 0;
+  padding-bottom: calc(var(--x-space-3) + var(--x-safe-bottom));
 }
 
 .date-quick-row {
