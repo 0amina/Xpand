@@ -592,6 +592,21 @@ The two deployments each need the other's URL, so one pass cannot settle both:
 4. `npm run bot:register` with `BOT_WEBHOOK_URL` set to the backend URL.
 5. @BotFather → `/myapps` → Edit Web App URL → the frontend URL.
 
+### Running locally will break the deployed bot
+
+Once a webhook is registered, `npm run dev` **deregisters it**. That is not a bug: Telegram
+refuses `getUpdates` while a webhook is set, so the polling path in `startBot()` calls
+`deleteWebhook` first or the local bot would never receive anything. One bot token cannot serve
+both at once.
+
+The consequence is that starting local development silently stops the deployed bot answering, and
+nothing surfaces it — production looks healthy, the webhook is simply gone. `npm run bot:register`
+puts it back.
+
+The real fix is **a second bot from @BotFather for local development**, with its token in the
+local `.env` and the production token only ever in Vercel. The two then cannot interfere, and it
+also means local testing never writes to the production ledger through chat commands.
+
 ### Caveats worth knowing
 
 - **A free Supabase project pauses after 7 days with no activity.** The first request after that
